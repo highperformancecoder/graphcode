@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Run Time Type Identification</TITLE>
+<META NAME="description" CONTENT="Run Time Type Identification">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node9.html">
+<LINK REL="previous" HREF="node7.html">
+<LINK REL="up" HREF="node5.html">
+<LINK REL="next" HREF="node9.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html114"
+ HREF="node9.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html111"
+ HREF="node5.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html105"
+ HREF="node7.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html113"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html115"
+ HREF="node9.html">Node and edge weights</A>
+<B> Up:</B> <A NAME="tex2html112"
+ HREF="node5.html">Objects</A>
+<B> Previous:</B> <A NAME="tex2html106"
+ HREF="node7.html">Virtual Constructors</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H2><A NAME="SECTION00033000000000000000">
+Run Time Type Identification</A>
+</H2>
+
+<P>
+To migrate an object from one thread to another, Graphcode needs to be
+able to create an object of the correct type in the destination
+address space. This is achieved by means of a <EM>run time type
+  identification</EM> (RTTI)<A NAME="87">&#160;</A> system. Given a type token
+<code>t</code>, an object of that type can be created by the call:<A NAME="88">&#160;</A><A NAME="89">&#160;</A>
+<PRE>
+object *o=archetype[t]-&gt;lnew();
+</PRE>
+<P>
+Instead of using C++'s built-in RTTI system, where tokens are compound
+objects of somewhat indeterminate size, Graphcode implements a simple
+RTTI system using template programming, in which a type token is a
+simple unsigned integer. This implies that each type of object
+to be used with Graph must be registered first, before use. This is
+taken care for you automatically if you use <code>Graph::AddObject()</code> to
+add your object to the Graph.
+
+<P>
+Adding the virtual type method to your class is also easy:<A NAME="92">&#160;</A>
+
+<P>
+<PRE>
+class foo: public object
+{
+ ...
+ virtual int type() {return vtype(*this);}
+};
+</PRE>
+<P>
+The first <code>vtype</code><A NAME="95">&#160;</A> is called on an object, an object
+of that type is created (via its <code>lcopy</code> method), and added to
+the archetype<A NAME="96">&#160;</A> vector. The index of that object within
+the archetype vector become the type token. <EM>It is vitally
+  important that types are added to the archetype vector in the same
+  order on all threads.</EM> Clearly this is a trivial requirement if only
+one type is used, but slightly more care needs to be taken in the case
+of multiple types of object.
+
+<P>
+If you have multiple object types, consider using the
+<code>register_type</code> template to ensure a consistent type registration
+across the different address spaces.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html114"
+ HREF="node9.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html111"
+ HREF="node5.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html105"
+ HREF="node7.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html113"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html115"
+ HREF="node9.html">Node and edge weights</A>
+<B> Up:</B> <A NAME="tex2html112"
+ HREF="node5.html">Objects</A>
+<B> Previous:</B> <A NAME="tex2html106"
+ HREF="node7.html">Virtual Constructors</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

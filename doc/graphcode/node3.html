@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Graph</TITLE>
+<META NAME="description" CONTENT="Graph">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node5.html">
+<LINK REL="previous" HREF="node1.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node4.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html54"
+ HREF="node4.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html51"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html45"
+ HREF="node2.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html53"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html55"
+ HREF="node4.html">Basic usage of Graph</A>
+<B> Up:</B> <A NAME="tex2html52"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html46"
+ HREF="node2.html">#1</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00020000000000000000">
+Graph</A>
+</H1>
+
+<P>
+A <EM>Graph</EM><A NAME="22">&#160;</A> is a container of references to
+<EM>objects</EM> (&#167;<A HREF="node5.html#object">2</A>)<A NAME="27">&#160;</A>
+(called <EM>objrefs</EM>
+    (&#167;<A HREF="node12.html#objref">3</A>))<A NAME="32">&#160;</A> that may be linked to an arbitrary
+  number of other objects. The objects themselves may be located on
+  other processors, ie the Graph may be distributed. Objects are
+  polymorphic -- the only properties Graph needs to know is how
+  create, copy, and serialise them, as well as what other objects they
+  are linked to.
+
+<P>
+Because the objects are polymorphic, it is possible to create
+hypergraphs. Simply have two types of object in the graph -- <EM>  pins</EM> and <EM>wires</EM>, say. A pin may be connected to multiple wire
+objects, just as wires may be connected to multiple pins.
+
+<P>
+The objrefs themselves are stored in a maplike object called an
+<EM>omap</EM> (&#167;<A HREF="node14.html#omap">5</A>), which is replicated
+across all processors. 
+
+<P>
+A short synopsis of Graph is as follows:
+<PRE>
+class Graph: public Ptrlist
+{
+public:
+  omap objects;
+
+  Graph&amp; operator=(const Graph&amp;);
+  Graph(Graph&amp;);
+  Graph();
+
+  /* object management */
+  objref&amp; AddObject(object* o, GraphID_t id, bool managed=false); 
+  template &lt;class T&gt;
+  objref&amp; AddObject(GraphID_t id); 
+  template &lt;class T&gt;
+  objref&amp; AddObject(const T&amp; master_copy, GraphID_t id); 
+
+  /* these methods must be called on all processors simultaneously */
+  void Prepare_Neighbours(bool cache_requests=false);
+  void Partition_Objects();
+  void Distribute_Objects();
+  void gather();
+
+  void rebuild_local_list();   
+  void clear_non_local()
+  void print(int proc) 
+};
+</PRE>
+<P>
+<DL>
+<DT><STRONG>Ptrlist</STRONG>
+<DD>(see &#167;<A HREF="node13.html#Ptrlist">4</A>)<A NAME="43">&#160;</A> is a list of
+references to <EM>objrefs</EM>
+    (&#167;<A HREF="node12.html#objref">3</A>))<A NAME="48">&#160;</A>, pointing to objects stored locally
+  on the current processor.
+<DT><STRONG>AddObject</STRONG>
+<DD><A NAME="49">&#160;</A> In the first form, add an already
+  created object to the Graph. In the second form create a new object
+  of type <EM>T</EM>, and add it to the Graph. <EM>T</EM> must be derived
+  from the abstract base class <code>object</code><A NAME="52">&#160;</A>. You must
+  explicitly supply the type of the object to be created as a template
+  argument:
+  <PRE>
+    g.AddObject&lt;foo&gt;(id);
+</PRE>  In the third form, create a new object, and initialise its data with
+  the contents of argument <code>master_copy</code>.
+<DT><STRONG>Prepare_Neighbours()</STRONG>
+<DD><A NAME="55">&#160;</A> For each
+  object on the local processor, ensure that all objects connected to
+  it are brought up to date, by obtaining data from remote processors
+  if necessary. If the network structure has not changed since the
+  last call to this method, set the flag
+  <code>cache_requests</code><A NAME="56">&#160;</A> to <code>true</code>, which
+  substantially reduces the amount of interprocessor communication
+  required.
+<DT><STRONG>Partition_Objects()</STRONG>
+<DD><A NAME="57">&#160;</A>Call the ParMETIS
+  partitioner to redistribute the graph in an optimal way over the
+  processors. ParMETIS executes in parallel, and requires that the
+  objects be distributed before this call. One way of achieving this is
+  to make a simple assignment of objects to processors (by setting the
+  <code>proc</code> member of each objref), then call <code>Distribute_Objects()</code>.
+<DT><STRONG>Distribute_Objects()</STRONG>
+<DD><A NAME="58">&#160;</A> Broadcast graph data
+  from processor 0, and call <BR><code>rebuild_local_list()</code> on each
+  processor.
+<DT><STRONG>gather()</STRONG>
+<DD><A NAME="59">&#160;</A> Bring the entire graph on processor 0 up
+  to date, copying information from remote processors as necessary. A
+  <code>gather()</code>, followed by <code>Distribute_Pins()</code> brings all
+  processors' graphs up-to-date. This is, naturally, an expensive
+  operation, and should be done for startup or checkpointing purposes.
+<DT><STRONG>rebuild_local_list()</STRONG>
+<DD><A NAME="60">&#160;</A> Reconstruct
+  the list of objrefs local to the current processor, according to the
+  <code>proc</code><A NAME="61">&#160;</A> member of the objrefs.
+<DT><STRONG>clear_non_local()</STRONG>
+<DD><A NAME="62">&#160;</A> Nullify all
+  objrefs that don't belong to the current processor. This can be used
+  to save memory usage.
+</DL>
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A NAME="CHILD_LINKS">&#160;</A>
+<UL>
+<LI><A NAME="tex2html56"
+ HREF="node4.html">Basic usage of Graph</A>
+</UL>
+<!--End of Table of Child-Links-->
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html54"
+ HREF="node4.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html51"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html45"
+ HREF="node2.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html53"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html55"
+ HREF="node4.html">Basic usage of Graph</A>
+<B> Up:</B> <A NAME="tex2html52"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html46"
+ HREF="node2.html">#1</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

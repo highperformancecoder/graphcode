@@ -1,0 +1,712 @@
+#ifndef GRAPHCODE_H
+#define GRAPHCODE_H
+
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+// needed to prevent a memory leak on Irix!!
+#undef Realloc
+#define Realloc(ptr,size) ((size==0)? (free(ptr), (void*)NULL): realloc(ptr,size))
+
+#ifdef MPI_SUPPORT
+#include <classdescMP.h>
+
+/* Metis stuff */
+extern "C" void METIS_PartGraphRecursive
+(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
+ unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
+ unsigned* edgecut, unsigned* part);
+extern "C" void METIS_PartGraphKway
+(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
+ unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
+ unsigned* edgecut, unsigned* part);
+
+#include <parmetis.h>
+
+#else
+typedef int idxtype;  /* just for defining dummy weight functions */
+#endif  /* MPI_SUPPORT */
+
+#include <pack_base.h>
+#include <pack_stl.h>
+
+#ifndef MAP
+#define MAP hmap
+#endif
+
+#define GRAPHCODE_NS graphcode_##MAP
+
+namespace GRAPHCODE_NS
+{
+  typedef unsigned long GraphID_t;
+  /* a pin with ID==bad_ID cannot be inserted into a map or wire 
+   - can be used for handling boundary conditions during graph construction */
+  const GraphID_t bad_ID=~0UL;
+
+  using std::vector;
+  using std::find_if;
+  using std::find;
+  using graphcode::archetypes
+
+#ifdef MPI_SUPPORT
+  /* MPI_Finalized only available in MPI-2 standard */
+  inline bool MPI_running()
+    {
+      int fi, ff=0; MPI_Initialized(&fi); 
+#if (defined(MPI_VERSION) && MPI_VERSION>1 || defined(MPICH_NAME))
+      MPI_Finalized(&ff); 
+#endif  /* MPI_VERSION>1 */
+      return fi&&!ff;
+    }
+#endif  /* MPI_SUPPORT */
+
+  inline  unsigned myid()
+    {
+      int m=0;
+#ifdef MPI_SUPPORT
+      if (MPI_running()) MPI_Comm_rank(MPI_COMM_WORLD,&m);
+#endif
+      return m;
+  }
+
+  inline unsigned nprocs()
+  {
+#ifdef MPI_SUPPORT
+    return MPIbuf().nprocs();
+#else
+    return 1;
+#endif
+  }
+
+  template <typename TYPE>
+  inline TYPE Wrap(TYPE val, TYPE limit)
+  {
+    if( val >= limit )
+      return val-limit;
+    else if( val < 0 )
+      return val+limit;
+    else
+      return val;
+  }
+
+#if 0
+  template <typename TYPE>
+  inline TYPE Wrap(TYPE val, unsigned TYPE limit)
+  {
+    if( val >= limit )
+      return val-limit;
+    else if( val < 0 )
+      return val+limit;
+    else
+      return val;
+  }
+#endif
+
+#if 0 /* lets try a different sort of vmap ! */
+  /* we use a type called graphcode::map with the semantics of
+     std::map. This may be replaced by a hash_map or something else be
+     defining GRAPHCODE_MAP.  One alternative is to use a contiguous
+     map, that has more efficient lookup properties if Pin IDs are
+     dense in some interval [0..max]. To use this, #define GRAPHCODE_MAP vmap */
+
+  template <class K, class V>
+  class vmap
+  {
+    /* class K must be castable to unsigned */
+    typedef pair<K,V> data_t;
+    typedef vector<data_t> datav;
+    typedef typename vector<data_t>::iterator data_iterator;
+    //    CLASSDESC_ACCESS_TEMPLATE(vmap);
+    //    friend class iterator;
+  public:
+    datav data;       // should really be private!
+    vector<int> mask; // should really be private!
+    class iterator
+    {
+      unsigned p;
+      vmap* themap;
+      friend class vmap;
+    public:
+      iterator(): p(0), themap(NULL) {}
+      iterator(unsigned x,const vmap* m): p(x), themap(const_cast<vmap*>(m)) {}
+      iterator(const iterator& x): p(x.p), themap(x.themap) {}
+      iterator& operator=(const iterator& x) 
+      {themap=x.themap; p=x.p; return *this;}
+      data_t& operator*() {return themap->data[p];}
+      data_t* operator->() {return &(themap->data[p]);}
+      iterator operator++(); 
+      iterator operator--(); 
+      iterator operator++(int); 
+      iterator operator--(int); 
+      bool operator==(const iterator& x) const {return themap==x.themap &&p==x.p;}
+      bool operator!=(const iterator& x) const {return !((*this)==x);}
+    };
+    typedef const iterator const_iterator;
+    typedef unsigned size_type;
+    const iterator begin() const {return const_iterator(0,this);}
+    const iterator end() const {return const_iterator(data.size(),this);}
+    iterator begin() {return const_iterator(0,this);}
+    iterator end() {return const_iterator(data.size(),this);}
+    V& operator[](const K& i) 
+    {
+      if (i>=data.size()) 
+	{
+	  data.resize(i+1);
+	  mask.resize(i+1);
+	}
+      mask[i]=true;
+      data[i].first=i;
+      return data[i].second; 
+    }
+    size_type size() const 
+    {
+      size_type sum=0;
+      for (unsigned i=0; i<data.size(); i++) sum+=mask[i];
+      return sum;
+    }
+    void erase(iterator i) {if (i.p<data.size()) mask[i.p]=false;} 
+    size_type count(const K& k) const {return k<data.size() && mask[k];}
+    void clear()  {data.clear(); mask.clear();}
+  };
+
+#ifdef GRAPHCODE_MAP
+  template <class K, class V> class map: public GRAPHCODE_MAP<K,V> {};
+#pragma omit pack graphcode::map
+#pragma omit unpack graphcode::map
+#pragma omit isa graphcode::map
+#pragma omit TCL_obj graphcode::map
+#else
+  using std::map;
+#endif //GRAPHCODE_MAP
+
+  template <class K, class V>
+  inline typename vmap<K,V>::iterator vmap<K,V>::iterator::operator++()
+  {
+    for (p++; p<themap->data.size() && !themap->mask[p]; p++); 
+    return iterator(p,themap); 
+  }
+  template <class K, class V>
+  inline typename vmap<K,V>::iterator vmap<K,V>::iterator::operator--()
+  {
+    for (p--; p >= 0 && !themap->mask[p]; p--); 
+    return iterator(p,themap);
+  }
+  template <class K, class V>
+  inline typename  vmap<K,V>::iterator vmap<K,V>::iterator::operator++(int)
+  {
+    iterator t(*this); 
+    for (p++; p < themap->data.size() && !themap->mask[p]; p++); 
+    return t; 
+  }
+  template <class K, class V>
+  inline  typename vmap<K,V>::iterator vmap<K,V>::iterator::operator--(int)
+  {
+    iterator t(*this); 
+    for (p--; p >= 0 && !themap->mask[p]; p--); 
+    return t; 
+  }
+
+#endif
+
+
+  /* base object of graphcode - can be a pin or a wire - whatever */
+  class object;
+  class omap;
+
+  class objref
+  {
+    object *payload; /* referenced data */
+  public:
+    omap *Map; /* reference to map containing this objref (if any) */
+    GraphID_t ID;
+    unsigned int proc;
+    bool managed;
+
+    struct id_eq /*predicate function testing whether x's ID is a given value*/
+    {
+      GraphID_t id; 
+      id_eq(GraphID_t i): id(i) {} 
+      bool operator()(const objref& x) {return x.ID==id;}
+    };
+
+    objref(GraphID_t i=0, int p=myid(), object *o=NULL): 
+      ID(i), proc(p), payload(o), managed(false), Map(NULL) {}
+    objref(GraphID_t i, int p, object &o): 
+      ID(i), proc(p), payload(&o), managed(false), Map(NULL)  {}
+    objref(const objref& x): payload(NULL) {*this=x;}
+    ~objref() {nullify();}
+    inline objref& operator=(const objref& x); 
+    object& operator*()  {assert(payload!=NULL); return *payload;}
+    object* operator->() {assert(payload!=NULL); return payload;}
+    const object* operator->() const {return payload;}
+    void addref(object* o, bool mflag=false) 
+    {nullify(); payload=o; managed=mflag;}
+    bool nullref() const {return payload==NULL;}
+    inline void nullify();
+  };
+
+
+  class vmap: public omap, std::vector<objref>
+  {
+  protected:
+    objref& at(GraphID_t i) 
+    {
+      if (i>=size()) resize(i+1);
+      return std::vector<objref>::operator[](i);
+    }
+  };
+
+  /* 
+     is this hashing function good enough? Dunno, 'cos it depends on your application.
+     Users can subsitute
+  */
+  const unsigned nbins=1<<16;
+  struct simple_hash
+  {
+    unsigned operator()(GraphID_t i) {return (i>>6)&&(nbins-1);}
+  };
+
+  template <class hash>
+  class hashmap
+  {
+    typedef vector<objref> v;
+    typedef vector<v> vv;
+    vv data;
+    hash h;
+
+    struct objref_eq
+    {
+      GraphID_t ID;
+      objref(GraphID_t i): ID(i) {}
+      bool operator()(const objref& x) {return x.ID==ID;}
+    };
+
+  protected:
+    objref& at(GraphID_t i) 
+    {
+      v& bin=vv[h(i)];
+      v::iterator elem=find_if(bin.begin(),bin.end(),objref_eq(i));
+      if (elem==bin.end())
+	{
+	  bin.push_back(objref(i));
+	  return bin.back();
+	}
+      return *elem;
+    }
+  public:
+    hmap(): data(nbins) {}
+    hmap(const hmap& x): data(x.data) {}
+
+    class iterator
+    {
+      vv::iterator i1;
+      v::iterator i2;
+      void incr() {i2++; if (i2==i1->end()) {i1++; i2=i1->begin();}}
+      void decr() {if (i2==i1->begin()) {i1--; i2=i1->end();} i2--;}
+    public:
+      iterator() {}
+      iterator(const iterator& x): i1(x.i1), i2(x.i2) {}
+      iterator(const vv::iterator& x,const v::iterator& y): i1(x), i2(y) {}
+      iterator operator++(int) {iterator r=*this; incr(); return r;}
+      iterator operator++() {incr(); return *this;}
+      iterator operator--(int) {iterator r=*this; decr(); return r;}
+      iterator operator++(int) {decr(); return *this;}
+      bool operator==(const iterator& x) {return i1==x.i1 && i2==x.i2;}
+      bool operator!=(const iterator& x) {return !x==*this}
+    }
+    iterator begin() {return iterator(data.begin(),data.begin()->begin());}
+    iterator end() {return iterator(data.end(),data.end()->begin());}
+  };
+
+  class hmap: public hash_map<simple_hash> {};
+
+  class omap: public MAP
+  {
+    objref bad_thing;
+  public:
+    omap() {bad_thing.ID=bad_ID;}
+    inline objref& operator[](GraphID_t i);
+    inline omap& operator=(const omap& x);
+  };
+
+    
+
+    /* we want the dereference of omap::iterator to be an objref, not a pair<> */
+    class iterator
+    {
+      map<GraphID_t,objref>::iterator it;
+    public:
+      iterator() {}
+      iterator(const iterator& x): it(x.it) {}
+      iterator(const map<GraphID_t,objref>::iterator& x): it(x) {}
+      iterator& operator=(const map<GraphID_t,objref>::iterator& i) {it=i;}
+      iterator& operator=(const iterator& i) {it=i.it;}
+      objref& operator*() {return it->second;}
+      objref* operator->() {return &(it->second);}
+      iterator operator++(int) {return iterator(it++);}
+      iterator operator--(int) {return iterator(it--);}
+      iterator operator++() {return iterator(++it);}
+      iterator operator--() {return iterator(--it);}
+      bool operator==(const iterator& x) const {return it==x.it;}
+      bool operator==(const map<GraphID_t,objref>::iterator& x) const 
+      {return it==x;}
+      bool operator!=(const iterator& x) const {return !((*this)==x);}
+    };
+  };
+
+#pragma omit pack graphcode::omap
+#pragma omit unpack graphcode::omap
+#pragma omit isa graphcode::omap
+#pragma omit pack graphcode::omap::iterator
+#pragma omit unpack graphcode::omap::iterator
+#pragma omit isa graphcode::omap::iterator
+
+  inline void pack(pack_t *buf, eco_string desc, omap& arg)
+  {
+    (*buf) << arg.size();
+    for (omap::iterator i=arg.begin(); i!=arg.end(); i++)
+      (*buf) << i->ID << *i;
+  }
+
+  inline void unpack(pack_t *buf, eco_string desc, omap& arg)
+  {
+    unsigned sz; (*buf)>>sz;
+    GraphID_t ID;
+    for (; sz>0; sz--)
+      {
+	(*buf)>>ID;
+	(*buf)>>arg[ID];
+      }
+  }
+
+  class Ptrlist 
+  {
+    vector<objref*> list;
+  public:
+
+    omap *Map;
+    Ptrlist(omap *m=NULL): Map(m) {}
+
+    class iterator
+    {
+      typedef vector<objref*>::const_iterator vec_it;
+      vec_it iter;
+    public:
+      iterator& operator=(const vec_it& x) {iter=x;}
+      iterator() {}
+      iterator(const iterator& x) {iter=x.iter;}
+      iterator(vec_it x)  {iter=x;}
+      objref& operator*() {return **iter;}
+      objref* operator->() {return *iter;}
+      iterator operator++() {return iterator(++iter);}
+      iterator operator--() {return iterator(--iter);}
+      iterator operator++(int) {return iterator(iter++);}
+      iterator operator--(int) {return iterator(iter--);}
+      bool operator==(const iterator& x) const {return x.iter==iter;}
+      bool operator!=(const iterator& x) const {return x.iter!=iter;}
+    };
+    iterator begin() const {return iterator(list.begin());}
+    iterator end() const {return iterator(list.end());}
+    objref& operator[](unsigned i) const 
+    {
+      assert(i<list.size());
+      return *list[i];
+    }
+    void push_back(objref* x) 
+    {
+      if (x->ID!=bad_ID)
+	{
+	  if (Map)
+	    list.push_back(&(*Map)[x->ID]); 
+	  else 
+	    list.push_back(x);
+	}
+    }
+    void push_back(objref& x) {push_back(&x);}     
+    void erase(GraphID_t i) 
+    {
+      vector<objref*>::iterator it;
+      for (it=list.begin(); it!=list.end(); it++) if ((*it)->ID==i) break;
+      if ((*it)->ID==i) list.erase(it);
+    }
+    void clear() {list.clear();}
+    unsigned size() const {return list.size();}
+    Ptrlist& operator=(const Ptrlist &x)
+    {
+      /* assignment of these refs must also fix up pointers to be consistent 
+	 with the map */
+      clear();
+      if (Map)
+	for (Ptrlist::iterator i=x.begin(); i!=x.end(); i++)
+	  list.push_back(&(*Map)[i->ID]);
+    }
+    void lpack(pack_t& targ) 
+    {
+      targ<<size();
+      for (iterator i=begin(); i!=end(); i++) targ << i->ID;
+    }
+    void lunpack(pack_t& targ) 
+    {
+      clear();
+      unsigned size; targ>>size;
+      assert(Map!=NULL);
+      for (unsigned i=0; i<size; i++)
+	{
+	  GraphID_t id; int proc; targ>>id; 
+	  push_back(&(*Map)[id]);
+	}
+    }
+  };
+
+#pragma omit pack graphcode::Ptrlist
+#pragma omit unpack graphcode::Ptrlist
+#pragma omit pack graphcode::Ptrlist::iterator
+#pragma omit unpack graphcode::Ptrlist::iterator
+
+  inline void pack  (pack_t *targ, eco_string desc, Ptrlist& arg) {arg.lpack(*targ);}
+  inline void unpack(pack_t *targ, eco_string desc, Ptrlist& arg) {arg.lunpack(*targ);}
+
+  /* this object will be derived from in order to create pins, wires etc */
+  /* an object, first and foremost is a list of other objects (maybe
+     its neighbours, maybe its classes or families to which it
+     belongs) */
+  class object: public Ptrlist
+  {
+  public:
+    /* serialisation methods */
+    virtual void lpack(pack_t *buf)=0; 
+    virtual void lunpack(pack_t *buf)=0;
+    /* virtual "constructors" */
+    virtual object* lnew() const=0;  
+    virtual object* lcopy() const=0;  
+    virtual ~object() {}
+    /* partition weightings - redefine in derived type if needed */
+    virtual int type() const=0;     /* return index into archetype table */
+    virtual idxtype weight() const {return 1;}
+    virtual idxtype edgeweight(const objref& x) const {return 1;}
+  };
+
+  /* implementation of the virtual constructors */
+  template <class T> object *vnew(const T* x) {T* r=new T; return r;}
+  template <class T> object *vcopy(const T* x) {T* r=new T; *r=*x; return r;}
+
+  /* 
+     We use a system of runtime type identification, not the C++ RTTI
+     system, because we can represent type tokens as a simple word, and
+     index in the archetypes array, rather than a complicated typeinfo
+     struct. objects have methods that return their type. This requires
+     that users register the types they wish to use with this system.
+
+     archetypes - stores an archetype object for each registered type.  
+  */
+  extern Ptrlist archetype;
+  
+  template <class T> int vtype(const T& x, bool init=false) 
+  {
+    static int t=-1;
+    if (init || t==-1)
+      {
+	t=archetype.size();
+	objref *o=new objref; o->addref(x.lnew());
+	archetype.push_back(o);
+      }
+    assert(t>=0);
+    return t;
+  }
+
+  /* insert the macro DEF_VIRT in your class definition to provide 
+     appropriate virtual functions automatically */
+#define DEF_VIRT \
+virtual void lpack(pack_t *buf) {::pack(buf,"",*this);} \
+virtual void lunpack(unpack_t *buf) {::unpack(buf,"",*this);} \
+virtual ::graphcode::object *lnew() const {return ::graphcode::vnew(this);} \
+virtual ::graphcode::object *lcopy() const {return ::graphcode::vcopy(this);} \
+virtual int type() const {return ::graphcode::vtype(*this);}
+
+  inline void objref::nullify()  
+  {
+    if (managed) delete payload;
+    managed=false; payload=NULL;
+  } 
+
+  inline objref& objref::operator=(const objref& x) 
+  {
+    nullify(); 
+    ID=x.ID; proc=x.proc; 
+    if (x.managed && x.payload)
+      {
+	payload=x->lcopy(); 
+	managed=true;
+      }
+    else
+      {
+	payload=x.payload;
+	managed=false;
+      }
+  }
+
+  inline objref& omap::operator[](GraphID_t i)
+  {
+    if (i==bad_ID) 
+      return bad_thing;
+    else
+      {
+	objref& o=at(i);
+	o.ID=i; /* enforce consistent ID field */
+	o.Map=this;
+	if (!o.nullref()) o->Map=this; /* update Map pointer */
+	return o;
+      }
+  } 
+
+  inline omap& omap::operator=(const omap& x)
+  {
+    for (iterator i=x.begin(); i!=x.end(); i++)
+      {
+	objref& o=at(i->ID);
+	o.ID=i->ID; o.proc=i->proc;
+	if (!i->nullref())
+	  {
+	    if (o.nullref() ||o->type()!=(*i)->type())
+	    /* we need to create a new object */
+	      {
+		o.addref((*i)->lnew(),true);
+		o->Map=this; /* Make sure map pointer is correct */
+	      }
+	    *o=**i;  /* assign object */
+	  }
+	else
+	  o.nullify();
+      }
+    return *this;
+  }
+
+#pragma omit pack graphcode::objref
+#pragma omit unpack graphcode::objref
+#pragma omit isa graphcode::objref
+  inline void pack(pack_t *targ, eco_string desc, objref& arg) 
+  { 
+   pack(targ,desc,arg.ID);
+    pack(targ,desc,arg.proc);
+    if (arg.nullref()) 
+      *targ<<-1;
+    else 
+      {
+	pack(targ,desc,arg->type());
+	arg->lpack(targ);
+      }
+  }
+
+  inline void unpack(pack_t *targ, eco_string desc, objref& arg) 
+  {
+    unpack(targ,desc,arg.ID);
+    unpack(targ,desc,arg.proc);
+    int t; *targ>>t;
+    if (t<0) 
+      {
+	arg.nullify();
+	return;
+      }
+    else if (arg.nullref() || arg->type()!=t)
+      {
+	arg.nullify();
+	arg.addref(archetype[t]->lnew(),true);
+	arg->Map=arg.Map;
+      }
+    arg->lunpack(targ);
+  }
+
+  /* Graph is a list of node refs stored on local processor, and has a
+     map of object references (called objects) referring to the nodes.   */
+
+  class Graph: public Ptrlist
+  {
+    //    CLASSDESC_ACCESS(class graphcode::Graph);
+
+  public: //(should be) private:
+    vector<vector<GraphID_t> > rec_req; 
+    vector<vector<GraphID_t> > requests; 
+    unsigned tag;  /* tag used to ensure message groups do not overlap */
+    bool type_registered(const object* x) {return x->type()>=0;}
+
+  public:
+    omap objects;
+    Graph(): Ptrlist(&objects) {}
+    Graph(const Graph& g): Ptrlist(&objects) {*this=g;}
+
+//    Graph& operator=(const Graph& x)
+//    {
+//      objects=x.objects; rec_req=x.rec_req; requests=x.requests;
+//      rebuild_local_list();
+//    }
+
+    void rebuild_local_list()
+    {
+      clear();
+      for (omap::iterator p=objects.begin(); p!=objects.end(); p++)
+	if (p->proc==myid()) Ptrlist::push_back(*p);
+    }
+
+    void clear_non_local()
+    {
+      for (omap::iterator i=objects.begin(); i!=objects.end(); i++) 
+	if (i->proc!=myid()) i->nullify();
+    }
+      
+    void print(int proc) 
+    {
+      if (proc==myid())
+	for (iterator i=begin(); i!=end(); i++)
+	  {
+	    std::cout << " i->ID="<<i->ID<<":";
+	    for (object::iterator j=(*i)->begin(); j!=(*i)->end(); j++)
+	      std::cout << j->ID <<",";
+	    std::cout << std::endl;
+	  }
+    }
+
+
+    /* these method must be called on all processors simultaneously */
+    void gather();
+    void Prepare_Neighbours(bool cache_requests=false);
+    void Partition_Objects();
+    inline void Distribute_Objects();
+
+    objref& AddObject(object* o, GraphID_t id, bool managed=false) 
+    {
+      objref& p=objects[id]; 
+      o->Map=&objects;
+      p.addref(o,managed); 
+      assert(type_registered(o));
+      return p;
+    }
+    objref& AddObject(object& p, GraphID_t id) {return AddObject(&p,id);}
+    template <class T>
+    objref& AddObject(const T& type, GraphID_t id) 
+    {
+      object* o=new T; 
+      vtype(type);
+      return AddObject(o,id,true);
+    }
+
+  };		   
+  
+
+  inline void 
+  Graph::Distribute_Objects()
+  {
+#ifdef MPI_SUPPORT
+    rec_req.clear();
+    MPIbuf() << objects << bcast(0) >> objects;
+    rebuild_local_list();
+#endif
+  }
+  
+};
+
+/* export pack/unpack routines */
+using graphcode::pack;
+using graphcode::unpack;
+
+#endif  /* GRAPHCODE_H */

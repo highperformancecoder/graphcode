@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Using graphcode in parallel</TITLE>
+<META NAME="description" CONTENT="Using graphcode in parallel">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node18.html">
+<LINK REL="previous" HREF="node16.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node18.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html210"
+ HREF="node18.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html207"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html201"
+ HREF="node16.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html209"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html211"
+ HREF="node18.html">Examples</A>
+<B> Up:</B> <A NAME="tex2html208"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html202"
+ HREF="node16.html">Building Graphcode</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00080000000000000000">
+Using graphcode in parallel</A>
+</H1>
+
+<P>
+To use graphcode in parallel, you need to install
+Classdesc,<A NAME="160">&#160;</A> ParMETIS<A NAME="161">&#160;</A><A NAME="162">&#160;</A> and
+MPI.<A NAME="163">&#160;</A> Define the preprocessor symbol
+<code>MPI_SUPPORT</code><A NAME="164">&#160;</A> to enable the parallel
+processing code. An example Makefile for the <code>poisson_demo</code>
+example illustrate how this is done.<A NAME="165">&#160;</A>
+
+<P>
+You will need to arrange the class definitions for your objects, as
+well as the graphcode.h file to be processed by 
+classdesc. One way of doing this is to <code>#include</code> .cd files into one of
+the C++ source files, and have a <code>.h.cd</code> rule in your Makefile, as
+suggested in the classdesc documentation.
+
+<P>
+<BR><HR>
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

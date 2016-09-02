@@ -1,0 +1,140 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>objref</TITLE>
+<META NAME="description" CONTENT="objref">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node13.html">
+<LINK REL="previous" HREF="node5.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node13.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html156"
+ HREF="node13.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html153"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html147"
+ HREF="node11.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html155"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html157"
+ HREF="node13.html">Ptrlist</A>
+<B> Up:</B> <A NAME="tex2html154"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html148"
+ HREF="node11.html">Self linking nodes</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00040000000000000000">&#160;</A><A NAME="109">&#160;</A><A NAME="objref">&#160;</A>
+<BR>
+objref
+</H1>
+
+<P>
+For every object in the Graphcode system, there is an <code>objref</code> on
+every processor referring to it.
+
+<P>
+Synopsis:
+<PRE>
+  class objref
+  {
+  public:
+    GraphID_t ID;
+    unsigned int proc;
+
+    objref(GraphID_t id=0, int proc=myid(), object *o=NULL);
+    objref(GraphID_t id, int proc, object &amp;o); 
+    objref(const objref&amp; x);
+    ~objref();
+
+    objref&amp; operator=(const objref&amp; x); 
+    object&amp; operator*();
+    object* operator-&gt;();
+    const object* operator-&gt;() const;
+    const object* operator-&gt;() const;
+    void addref(object* o, bool mflag=false); 
+    bool nullref() const;
+    void nullify();
+  };
+</PRE>
+<P>
+<DL>
+<DT><STRONG>ID</STRONG>
+<DD>A unique integer value that identifies the object within a Graph
+<DT><STRONG>proc</STRONG>
+<DD>The location of the active copy of the object
+<DT><STRONG><TT>*, -&gt;</TT></STRONG>
+<DD>Dereferencing an objref allows one to access the
+object. It is an error to dereference a nullified objref.
+<DT><STRONG>addref</STRONG>
+<DD>Add an object to this reference. The <code>mflag</code>
+  parameter indicates whether the object is managed (created by <code>new</code> or
+  <code>lnew()</code>), and can be safely <code>deleted</code> when nullified, or
+  is an external object that should not be deleted. An objref can also
+  be instantiated already pointing to an unmanaged object via its constructor.
+<DT><STRONG>nullref</STRONG>
+<DD>whether this objref points to an object or not. If the
+  active copy is on this processor, then nullref should be false.
+  Otherwise, it may true or false depending on whether this processor
+  has a cached copy of the object.
+<DT><STRONG>nullify</STRONG>
+<DD>Remove the object from the Graph (but leaving the
+  objref in place). It is an error to remove the active copy, without
+  replacing it with another object.
+</DL>
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html156"
+ HREF="node13.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html153"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html147"
+ HREF="node11.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html155"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html157"
+ HREF="node13.html">Ptrlist</A>
+<B> Up:</B> <A NAME="tex2html154"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html148"
+ HREF="node11.html">Self linking nodes</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

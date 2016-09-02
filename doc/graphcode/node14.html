@@ -1,0 +1,208 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>omap</TITLE>
+<META NAME="description" CONTENT="omap">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node16.html">
+<LINK REL="previous" HREF="node13.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node15.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html178"
+ HREF="node15.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html175"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html169"
+ HREF="node13.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html177"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html179"
+ HREF="node15.html">Note on using macros</A>
+<B> Up:</B> <A NAME="tex2html176"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html170"
+ HREF="node13.html">Ptrlist</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00060000000000000000">&#160;</A><A NAME="122">&#160;</A><A NAME="omap">&#160;</A>
+<BR>
+omap
+</H1>
+
+<P>
+An omap is a container for storing <EM>objrefs</EM>
+  &#167;(<A HREF="node12.html#objref">3</A>)<A NAME="128">&#160;</A>, indexed by ID.
+
+<P>
+<PRE>
+  class omap: public MAP
+  {
+  public:
+    objref&amp; operator[](GraphID_t i);
+    omap&amp; operator=(omap&amp; x);
+  };
+</PRE>
+<P>
+There are a few different possible ways of implementing omaps, with
+differing performance characteristics.  Graphcode provides two
+different models, <EM>vmap</EM> and <EM>hmap</EM> that may be readily
+deployed by the user, however users can fairly easily provide their
+own implementation if desired. Different implementations can be
+selected by defining the <code>MAP</code> macro<A NAME="133">&#160;</A> to be the desired
+omap implementation before including <code>graphcode.h</code>. This will
+declare everything in the namespace
+<code>graphcode_vmap</code><A NAME="134">&#160;</A> or
+<code>graphcode_hmap</code><A NAME="135">&#160;</A> as appropriate. Using
+this scheme, it is possible to have two different omap types in the
+one object file, by including graphcode.h twice. However, if you do
+this, you will need to <code>#undef GRAPHCODE_H</code> guard variable prior
+to subsequent includes.
+
+<P>
+vmap is intended for use with contiguous GraphID ranges. If there are
+holes in the identifier range, then the iterator will return invalid
+references for these holes, and the size() method will be incorrect.
+
+<P>
+If you need to have non-contiguous ID ranges (perhaps for dynamic
+graph management -- note this is not currently supported), then please
+use the hmap<A NAME="136">&#160;</A> implementation instead (which will have some performance
+penalty).
+
+<P>
+MAP must provide the following members:
+<PRE>
+class MAP
+{
+  protected:
+    objref&amp; at(GraphID_t i);
+  public:
+    MAP();
+    MAP(const MAP&amp;)
+    class iterator
+     {
+       iterator();
+       iterator(const iterator&amp;);
+       iterator&amp; operator=(const iterator&amp;); 
+       iterator operator++(int);
+       iterator operator++();
+       iterator operator--(int);
+       iterator operator--();
+       bool operator==(const iterator&amp; x) const;
+       bool operator!=(const iterator&amp; x) const;
+       objref&amp; operator*();
+       objref* operator-&gt;();
+     };
+    iterator begin();
+    iterator end();
+    unsigned size();
+}
+</PRE>   
+The <code>at</code><A NAME="139">&#160;</A> method is essentially a replacement for <code>operator[]()</code>. A
+simple example of an omap implementation is provided by <code>vmap</code><A NAME="140">&#160;</A>:
+<PRE>
+class vmap: public std::vector&lt;objref&gt;
+{
+protected:
+  objref&amp; at(GraphID_t i) 
+  {
+    if (i&gt;=size()) resize(i+1);
+    return std::vector&lt;objref&gt;::operator[](i);
+  }
+};
+</PRE>
+<P>
+hmap is a hash map implementation. With all hash maps, performance of
+the map is critically dependent upon the choice of hash function, which
+is application dependent. hmap is simply defined as:
+<PRE>
+class hmap: public hashmap&lt;simple_hash&gt; {};
+</PRE>You can provide your own omap definition (umap, say), with your own
+user defined hash function in the following way:
+<DL COMPACT>
+<DT>1.
+<DD>Create a file ``umap'' somewhere in the default search path with
+the following:
+<PRE>
+#include "hashmap.h"
+struct myhash
+{
+  unsigned operator()(GraphID_t i) {...}
+};
+class umap: public hashmap&lt;myhash&gt; {};
+</PRE><DT>2.
+<DD>Add the new omap definitions to the Graphcode library:
+<PRE>
+make MAP=umap
+</PRE><DT>3.
+<DD>Include the declarations of the <code>graphcode_umap</code> namespace
+  in your application source file:
+<PRE>
+#define MAP umap
+#undef GRAPHCODE_H
+#include &lt;graphcode.h&gt;
+</PRE></DL>
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A NAME="CHILD_LINKS">&#160;</A>
+<UL>
+<LI><A NAME="tex2html180"
+ HREF="node15.html">Note on using macros to parametrise omap</A>
+</UL>
+<!--End of Table of Child-Links-->
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html178"
+ HREF="node15.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html175"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html169"
+ HREF="node13.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html177"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html179"
+ HREF="node15.html">Note on using macros</A>
+<B> Up:</B> <A NAME="tex2html176"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html170"
+ HREF="node13.html">Ptrlist</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

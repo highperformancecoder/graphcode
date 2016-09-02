@@ -1,0 +1,100 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Objects</TITLE>
+<META NAME="description" CONTENT="Objects">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node12.html">
+<LINK REL="previous" HREF="node3.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node6.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html75"
+ HREF="node6.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html72"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html66"
+ HREF="node4.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html74"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html76"
+ HREF="node6.html">Serialisation methods</A>
+<B> Up:</B> <A NAME="tex2html73"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html67"
+ HREF="node4.html">Basic usage of Graph</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00030000000000000000">&#160;</A><A NAME="69">&#160;</A><A NAME="object">&#160;</A>
+<BR>
+Objects
+</H1>
+
+<P>
+<code>object</code> is an abstract base class, from which all objects stored
+in the graph must be derived. A synopsis of the ABC is:
+<PRE>
+  class object: public Ptrlist
+  {
+  public:
+    /* serialisation methods */
+    virtual void lpack(pack_t *buf)=0; 
+    virtual void lunpack(pack_t *buf)=0;
+    /* virtual "constructors" */
+    virtual object* lnew() const=0;  
+    virtual object* lcopy() const=0;  
+    virtual ~object() {}
+    virtual int type() const=0;     /* return index into archetype table */
+    /* partition weightings - redefine in derived type if needed */
+    virtual idxtype weight() const {return 1;}
+    virtual idxtype edgeweight(const objref&amp; x) const {return 1;}
+  };
+</PRE>
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A NAME="CHILD_LINKS">&#160;</A>
+<UL>
+<LI><A NAME="tex2html77"
+ HREF="node6.html">Serialisation methods</A>
+<LI><A NAME="tex2html78"
+ HREF="node7.html">Virtual Constructors</A>
+<LI><A NAME="tex2html79"
+ HREF="node8.html">Run Time Type Identification</A>
+<LI><A NAME="tex2html80"
+ HREF="node9.html">Node and edge weights</A>
+<LI><A NAME="tex2html81"
+ HREF="node10.html">Edge list</A>
+<LI><A NAME="tex2html82"
+ HREF="node11.html">Self linking nodes</A>
+</UL>
+<!--End of Table of Child-Links-->
+<BR><HR>
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

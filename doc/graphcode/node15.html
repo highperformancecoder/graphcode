@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Note on using macros to parametrise omap</TITLE>
+<META NAME="description" CONTENT="Note on using macros to parametrise omap">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="previous" HREF="node14.html">
+<LINK REL="up" HREF="node14.html">
+<LINK REL="next" HREF="node16.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html188"
+ HREF="node16.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html185"
+ HREF="node14.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html181"
+ HREF="node14.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html187"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html189"
+ HREF="node16.html">Building Graphcode</A>
+<B> Up:</B> <A NAME="tex2html186"
+ HREF="node14.html">omap</A>
+<B> Previous:</B> <A NAME="tex2html182"
+ HREF="node14.html">omap</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H2><A NAME="SECTION00061000000000000000">
+Note on using macros to parametrise omap</A>
+</H2>
+
+<P>
+It might seem obvious that omap could be made a templated type, with a
+single template parameter being the implementation of the
+omap. Unfortunately, omaps contain objects, which in turn have
+Ptrlists (the edge list), which used to maintain a reference to an
+omap. So objects and objrefs must be similarly parametrised by by the
+omap implementation type. However the omap implementation type will
+also need to reference the parametrised objrefs, leading to an
+implementation type parametrised by itself, an unparsable situation.
+
+<P>
+The way out of this dilemma is to make omap an abstract base class,
+which can be made into a concrete implementation as part of the
+definition of Graph. However, this introduces an extra level of
+overhead in calling virtual functions when performing object
+lookup, which is not insignificant. It also dramatically increases the complexity of coding
+<code>object::iterator</code>, which also would need to be an abstract base
+class.
+
+<P>
+In view of this, the macro based solution finally chosen, seemed the
+cleanest, and most efficient means of implementing different omap
+implementations.
+
+<P>
+Obviously, this reason is no longer relevant, however there doesn't seem to
+be any burning reason to change the macro parametrisation to a
+template argument.
+
+<P>
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html188"
+ HREF="node16.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html185"
+ HREF="node14.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html181"
+ HREF="node14.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html187"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html189"
+ HREF="node16.html">Building Graphcode</A>
+<B> Up:</B> <A NAME="tex2html186"
+ HREF="node14.html">omap</A>
+<B> Previous:</B> <A NAME="tex2html182"
+ HREF="node14.html">omap</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

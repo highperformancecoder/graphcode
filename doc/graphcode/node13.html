@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Ptrlist</TITLE>
+<META NAME="description" CONTENT="Ptrlist">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node14.html">
+<LINK REL="previous" HREF="node12.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node14.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html167"
+ HREF="node14.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html164"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html158"
+ HREF="node12.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html166"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html168"
+ HREF="node14.html">omap</A>
+<B> Up:</B> <A NAME="tex2html165"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html159"
+ HREF="node12.html">objref</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00050000000000000000">&#160;</A><A NAME="117">&#160;</A><A NAME="Ptrlist">&#160;</A>
+<BR>
+Ptrlist
+</H1>
+
+<P>
+Ptrlists work a bit like <code>std::vector&lt;objref&gt;</code> -- objrefs can be
+added with <code>Ptrlist::push_back()</code>, indexed with standard array
+indexing <code>Ptrlist::operator[]</code>, and iterated over in the usual
+way with <code>Ptrlist::iterator</code>. However, unlike
+<code>std::vector&lt;objref&gt;</code>, only pointers to the objref is stored
+within <code>Ptrlist</code>, not copies.
+
+<P>
+Synopsis:
+
+<P>
+<PRE>
+class Ptrlist 
+  {
+  public:
+    
+    class iterator
+    {
+    public:
+      objref&amp; operator*();
+      objref* operator-&gt;();
+      iterator operator++();
+      iterator operator--();
+      iterator operator++(int);
+      iterator operator--(int);
+      bool operator==(const iterator&amp; x);
+      bool operator!=(const iterator&amp; x);
+    };
+    iterator begin() const;
+    iterator end() const;
+    objref &amp;    front ()
+    objref &amp;    back ()
+    unsigned size() const;
+    objref&amp; operator[](unsigned i) const; 
+    void push_back(objref* x);
+    void push_back(objref&amp; x);
+    void erase(GraphID_t i);
+    void clear();
+    Ptrlist&amp; operator=(const Ptrlist &amp;x);
+  };
+</PRE>
+<P>
+Ptrlists can only refer to objects stored in objectMap.
+Ptrlists can be serialised -- Ptrlists must be unpacked within the
+context of an omapthe objectMap.
+
+<P>
+If you need to use a backing map, you can declare another omap object
+and assign objectMap to it. This will create copies of all the objects
+contained within objectMap.
+
+<P>
+<BR><HR>
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

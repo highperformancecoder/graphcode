@@ -1,0 +1,81 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Building Graphcode</TITLE>
+<META NAME="description" CONTENT="Building Graphcode">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="next" HREF="node17.html">
+<LINK REL="previous" HREF="node14.html">
+<LINK REL="up" HREF="graphcode.html">
+<LINK REL="next" HREF="node17.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html199"
+ HREF="node17.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html196"
+ HREF="graphcode.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html190"
+ HREF="node15.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html198"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html200"
+ HREF="node17.html">Using graphcode in parallel</A>
+<B> Up:</B> <A NAME="tex2html197"
+ HREF="graphcode.html">Graphcode Documentation</A>
+<B> Previous:</B> <A NAME="tex2html191"
+ HREF="node15.html">Note on using macros</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H1><A NAME="SECTION00070000000000000000">
+Building Graphcode</A>
+</H1>
+
+<P>
+In building graphcode, you configure the options you want by setting
+Make variables on the command line:
+<DL>
+<DT><STRONG>MPI=1</STRONG>
+<DD>Build the MPI version of Graphcode
+<DT><STRONG>MAP=</STRONG>
+<DD>specify which map to use for omap. hmap is the
+default. You can build a library supporting multiple different omap
+  types by issuing successive make commands:
+<PRE>
+make MAP=vmap
+make MAP=hmap
+</PRE><DT><STRONG>DEBUGGING=1</STRONG>
+<DD>Used to enable assertions, as well as debugger
+  symbols. Optimisation is turned off
+<DT><STRONG>PREFIX=</STRONG>
+<DD>specify an install directory when building the
+  <code>install</code> target (default <code>~/usr</code>).
+</DL>
+<P>
+<BR><HR>
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>

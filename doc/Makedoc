@@ -1,0 +1,15 @@
+. /usr/local/share/aegis/profile
+aerm graphcode
+aecp graphcode.ps
+latex graphcode
+makeindex graphcode.idx
+bibtex graphcode
+latex graphcode
+latex graphcode
+dvips graphcode
+TMP=/tmp/eco-doc$$
+mkdir $TMP
+latex2html -tmp $TMP graphcode
+rm -rf $TMP
+rm *~ *.aux *.dvi *.log *.blg *.toc *.lof *.ilg *.idx
+aenf graphcode

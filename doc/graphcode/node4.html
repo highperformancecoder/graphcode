@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--Converted with LaTeX2HTML 98.1p1 release (March 2nd, 1998)
+originally by Nikos Drakos (nikos@cbl.leeds.ac.uk), CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>Basic usage of Graph</TITLE>
+<META NAME="description" CONTENT="Basic usage of Graph">
+<META NAME="keywords" CONTENT="graphcode">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<LINK REL="STYLESHEET" HREF="graphcode.css">
+<LINK REL="previous" HREF="node3.html">
+<LINK REL="up" HREF="node3.html">
+<LINK REL="next" HREF="node5.html">
+</HEAD>
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html64"
+ HREF="node5.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next"
+ SRC="/usr/local/lib/latex2html/icons.gif/next_motif.gif"></A> 
+<A NAME="tex2html61"
+ HREF="node3.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up"
+ SRC="/usr/local/lib/latex2html/icons.gif/up_motif.gif"></A> 
+<A NAME="tex2html57"
+ HREF="node3.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous"
+ SRC="/usr/local/lib/latex2html/icons.gif/previous_motif.gif"></A>  
+<A NAME="tex2html63"
+ HREF="node19.html">
+<IMG WIDTH="43" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="index"
+ SRC="/usr/local/lib/latex2html/icons.gif/index_motif.gif"></A> 
+<BR>
+<B> Next:</B> <A NAME="tex2html65"
+ HREF="node5.html">Objects</A>
+<B> Up:</B> <A NAME="tex2html62"
+ HREF="node3.html">Graph</A>
+<B> Previous:</B> <A NAME="tex2html58"
+ HREF="node3.html">Graph</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H2><A NAME="SECTION00021000000000000000">
+Basic usage of Graph</A>
+</H2>
+
+<P>
+<EM>Graph</EM> is designed to be used in a SPMD parallel environment,
+using MPI to handle messages between processors. A copy of the Graph
+object is maintained on each process. Each process has a copy of the
+objref database (of type <code>omap</code>), called
+<code>GRAPHCODE_NS::objectMap</code>. The <code>Graph::objects</code> reference
+refers to this database. However the payload pointer of each objref
+will tend to only point to an object if the object is located in the
+current processes address space, or a cached copy of the remote object
+is needed for some reason. Otherwise it may be set to NULL to save
+space.
+
+<P>
+To call a method <code>foo()</code> on all objects of a Graph <code>g</code> (in
+parallel), execute the following code:
+<PRE>
+for (Graph::iterator i=g.begin(); i!=g.end(); i++)
+   (*i)-&gt;foo();
+</PRE>
+<P>
+If the method <code>foo</code> needs to know the values of neighbouring
+nodes, then you may call <code>Graph::Prepare_Neighbours()</code>, which
+ensures that a cached copy of any remotely located node linked to a
+local nodes is retrieved from the remote node. Thus arbitrary
+communication patterns can be expressed simply by the form of the
+network structure of the Graph.
+
+<P>
+<BR><HR>
+<ADDRESS>
+<I>Russell Standish</I>
+<BR><I>2007-03-13</I>
+</ADDRESS>
+</BODY>
+</HTML>
