@@ -75,7 +75,7 @@ test/testvmap: test/testvmap.o libgraphcode.a
 	$(CPLUSPLUS) -c $(FLAGS) -o $@ $<
 
 .cc.d: 
-	gcc $(FLAGS) -w -MM -MG $< >$@
+	$(CPLUSPLUS) $(FLAGS) -w -MM -MG $< >$@
 
 .h.cd:
 	classdesc -nodef pack unpack <$< >$@
