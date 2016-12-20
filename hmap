@@ -6,7 +6,7 @@
 const unsigned int nbins=1<<16;
 struct simple_hash
 {
-  unsigned operator()(GraphID_t i) {return (i>>6)&&(nbins-1);}
+  unsigned operator()(GraphID_t i) {return (i>>6)&(nbins-1);}
 };
 
 #include "hashmap.h"
