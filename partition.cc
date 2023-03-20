@@ -127,9 +127,9 @@ namespace GRAPHCODE_NS
     int options[]={0,0,0,0,0}; /* for production */
     //int options[]={1,0xFF,15,0,0};  /* for debugging */
     MPI_Comm comm=MPI_COMM_WORLD;
-    ParMETIS_V3_PartKway(&counts[0],&offsets[0],&edges[0],&vwgts[0],&ewgts[0],
-			&weightflag,&numflag,&ncon,&nparts,&tpwgts[0],ubvec,options,
-			&edgecut,&partitioning[0],&comm);
+    ParMETIS_V3_PartKway(counts.data(),offsets.data(),edges.data(),vwgts.data(),ewgts.data(),
+			&weightflag,&numflag,&ncon,&nparts,tpwgts.data(),ubvec,options,
+			&edgecut,partitioning.data(),&comm);
 
     rec_req.clear(); /* destroy record of previous communication patterns */
 
