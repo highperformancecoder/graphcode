@@ -215,6 +215,11 @@ namespace GRAPHCODE_NS
   public:
     typedef vector<objref*>::size_type size_type;
 
+#if defined(__GNUC__) && !defined(__ICC)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
     class iterator: public std::iterator<std::random_access_iterator_tag,objref>
     {
       typedef vector<objref*>::const_iterator vec_it;
@@ -235,6 +240,11 @@ namespace GRAPHCODE_NS
       size_t operator-(const iterator& x) const {return iter-x.iter;}
       iterator operator+(size_t x) const {return iterator(iter+x);}
     };
+    
+#if defined(__GNUC__) && !defined(__ICC)
+#pragma GCC diagnostic pop
+#endif
+    
     iterator begin() const {return iterator(list.begin());}
     iterator end() const {return iterator(list.end());}
     objref& front()  {return *list.front();}
