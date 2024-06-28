@@ -1,7 +1,7 @@
 /*
   @copyright Russell Standish 2000-2013
   @author Russell Standish
-  This file is part of EcoLab
+  This file is part of Graphcode
 
   Open source licensed under the MIT license. See LICENSE for details.
 */
@@ -159,9 +159,9 @@ namespace GRAPHCODE_NS
       bool operator()(const objref& x) {return x.ID==id;}
     };
 
-    objref(GraphID_t i=0, int p=myid(), object *o=NULL): 
+    objref(GraphID_t i=0, int p=myid(), GRAPHCODE_NS::object *o=NULL): 
       payload(o), managed(false), ID(i), proc(p) {}
-    objref(GraphID_t i, int p, object &o): 
+    objref(GraphID_t i, int p, GRAPHCODE_NS::object &o): 
       payload(&o), managed(false), ID(i), proc(p)  {}
     objref(const objref& x): payload(NULL) {*this=x;}
     ~objref() {nullify();}
@@ -173,7 +173,7 @@ namespace GRAPHCODE_NS
     /** add a reference to an object. 
         \a mflag indicates object should be deleted when the objref is
     */
-    void addref(object* o, bool mflag=false) 
+    void addref(GRAPHCODE_NS::object* o, bool mflag=false) 
     {nullify(); payload=o; managed=mflag;}
     bool nullref() const {return payload==NULL;} /// is reference invalid?
     inline void nullify();  /// remove reference and delete target if managed
@@ -228,7 +228,7 @@ namespace GRAPHCODE_NS
       iterator& operator=(const vec_it& x) {iter=x; return *this;}
       iterator() {}
       iterator(const iterator& x) {iter=x.iter;}
-      iterator(vec_it x)  {iter=x;}
+      iterator(vector<GRAPHCODE_NS::objref*>::const_iterator x)  {iter=x;}
       objref& operator*() {return **iter;}
       objref* operator->() {return *iter;}
       iterator operator++() {return iterator(++iter);}
@@ -240,10 +240,6 @@ namespace GRAPHCODE_NS
       size_t operator-(const iterator& x) const {return iter-x.iter;}
       iterator operator+(size_t x) const {return iterator(iter+x);}
     };
-    
-#if defined(__GNUC__) && !defined(__ICC)
-#pragma GCC diagnostic pop
-#endif
     
     iterator begin() const {return iterator(list.begin());}
     iterator end() const {return iterator(list.end());}
@@ -296,6 +292,9 @@ namespace GRAPHCODE_NS
     }
   };
 
+#if defined(__GNUC__) && !defined(__ICC)
+#pragma GCC diagnostic pop
+#endif
 
   /** 
       base class for Graphcode objects.  an object, first and foremost
@@ -305,10 +304,8 @@ namespace GRAPHCODE_NS
   class object: public Ptrlist, virtual public classdesc::object
   {
   public:
-#ifdef TCL_OBJ_BASE_H
     /// allow exposure to TCL
     virtual void TCL_obj(const classdesc::string& d) {}
-#endif
     virtual ~object() {}
     virtual idxtype weight() const {return 1;} ///< node's weight (for partitioning)
     /// weight for edge connecting \c *this to \a x
@@ -384,12 +381,12 @@ namespace GRAPHCODE_NS
     vector<vector<GraphID_t> > rec_req; 
     vector<vector<GraphID_t> > requests; 
     unsigned tag;  /* tag used to ensure message groups do not overlap */
-    bool type_registered(const object& x) {return x.type()>=0;}
+    bool type_registered(const GRAPHCODE_NS::object& x) {return x.type()>=0;}
 
   public:
     omap& objects;
     Graph(): tag(0), objects(objectMap()) {}
-    Graph(Graph& g): objects(objectMap()) {*this=g;}
+    Graph(GRAPHCODE_NS::Graph& g): objects(objectMap()) {*this=g;}
 
     Graph& operator=(const Graph& x)
     {
@@ -453,7 +450,7 @@ namespace GRAPHCODE_NS
     /** 
         add the specified object into the Graph
     */
-    objref& AddObject(object* o, GraphID_t id, bool managed=false) 
+    objref& AddObject(GRAPHCODE_NS::object* o, GraphID_t id, bool managed=false) 
     {
       objref& p=objectMap()[id]; 
       o->type(); /* ensure type is registered */
@@ -461,7 +458,7 @@ namespace GRAPHCODE_NS
       assert(type_registered(*o));
       return p;
     }
-    objref& AddObject(object& p, GraphID_t id) {return AddObject(&p,id);}
+    objref& AddObject(GRAPHCODE_NS::object& p, GraphID_t id) {return AddObject(&p,id);}
     /**
        add a new object of type T:
        - use as graph.AddObject<foo>(id);
@@ -584,30 +581,31 @@ namespace classdesc_access
   };
 
 #ifdef TCL_OBJ_BASE_H
-  /* support for EcoLab TCL_obj method */
-#ifdef _CLASSDESC
-#pragma omit TCL_obj GRAPHCODE_NS::object
-#pragma omit pack classdesc_access::access_TCL_obj
-#pragma omit unpack classdesc_access::access_TCL_obj
-#endif
-  template <>
-  struct access_TCL_obj<GRAPHCODE_NS::object>
-  {
-    template <class U>
-    void operator()(cd::TCL_obj_t& targ, const cd::string& desc,U& arg)
-    {
-      static bool not_in_virt=true; // possible thread safety problem
-      if (not_in_virt)
-        {
-           TCL_obj(targ,desc+"",cd::base_cast<GRAPHCODE_NS::Ptrlist>::cast(arg));
-           TCL_obj(targ,desc+".type",arg,&GRAPHCODE_NS::object::type);
-           TCL_obj(targ,desc+".weight",arg,&GRAPHCODE_NS::object::weight);
-           not_in_virt=false;
-           arg.TCL_obj(desc); //This will probably recurse
-           not_in_virt=true;
-        }
-    }
-  }; 
+#include graphcode_TCL_obj.h
+//  /* support for EcoLab TCL_obj method */
+//#ifdef _CLASSDESC
+//#pragma omit TCL_obj GRAPHCODE_NS::object
+//#pragma omit pack classdesc_access::access_TCL_obj
+//#pragma omit unpack classdesc_access::access_TCL_obj
+//#endif
+//  template <>
+//  struct access_TCL_obj<GRAPHCODE_NS::object>
+//  {
+//    template <class U>
+//    void operator()(cd::TCL_obj_t& targ, const cd::string& desc,U& arg)
+//    {
+//      static bool not_in_virt=true; // possible thread safety problem
+//      if (not_in_virt)
+//        {
+//           TCL_obj(targ,desc+"",cd::base_cast<GRAPHCODE_NS::Ptrlist>::cast(arg));
+//           TCL_obj(targ,desc+".type",arg,&GRAPHCODE_NS::object::type);
+//           TCL_obj(targ,desc+".weight",arg,&GRAPHCODE_NS::object::weight);
+//           not_in_virt=false;
+//           arg.TCL_obj(desc); //This will probably recurse
+//           not_in_virt=true;
+//        }
+//    }
+//  }; 
 #endif
 
   template <>
