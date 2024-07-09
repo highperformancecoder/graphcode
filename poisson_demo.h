@@ -7,7 +7,7 @@
 */
 
 /* this is the per-pin data */
-struct cell: Object<cell, GRAPHCODE_NS::object>
+struct cell: graphcode::Object<cell>
 {
   double my_value;
   void update(const cell&);

@@ -23,7 +23,7 @@ extern double drand(void);
 #define MAP vmap
 #include "graphcode.h"
 #include "graphcode.cd"
-using namespace GRAPHCODE_NS;
+using namespace graphcode;
 using namespace std;
 
 #include "poisson_demo.h"
@@ -39,11 +39,11 @@ struct makeID_t
   { return Wrap(x,size) + size*Wrap(y,size);}
 };
 
-void print(objref& x)
+void print(ObjRef& x)
 {
-  std::cout << x.ID << " is connected to ";
-  for (Ptrlist::iterator p=x->begin(); p!=x->end(); p++)
-    std::cout << p->ID << " ";
+  std::cout << x.id() << " is connected to ";
+  for (auto& j: *x)
+    std::cout << j.id() << " ";
   std::cout << std::endl;
 };
 
@@ -61,31 +61,26 @@ void von::setup(int size)
   unsigned yprocs=nprocs()/xprocs;
   int i, j;
   makeID_t makeID(size);
-  objects[makeID(size-1,size-1)]; //optimised for vmaps
   for(j=0; j<size; j++)
     for(i=0; i<size; i++)
       {
-	objref& o=objects[makeID(i,j)];
-	o.proc=(i*xprocs) / size + (j*yprocs)/size*xprocs;
-	if (o.proc==myid()) 
-	  {
-	    AddObject(cell(),o.ID);
-	    o->push_back(objects[makeID(i-1,j)]);
-	    o->push_back(objects[makeID(i+1,j)]);
-	    o->push_back(objects[makeID(i,j-1)]);
-	    o->push_back(objects[makeID(i,j+1)]);
-	  }
-      }
-  rebuild_local_list();
-  Partition_Objects();
+	ObjRef o=AddObject<cell>(makeID(i,j));
+        o->proc=(i*xprocs) / size + (j*yprocs)/size*xprocs;
+        o->neighbours.push_back(makeID(i-1,j)); 
+        o->neighbours.push_back(makeID(i+1,j)); 
+        o->neighbours.push_back(makeID(i,j-1)); 
+        o->neighbours.push_back(makeID(i,j+1)); 
+      }                                         
+  rebuildPtrLists();
+  partitionObjects();
 }
 
 void cell::update(const cell& from)
 {
   double sum_nbr=0;
-  for (Ptrlist::iterator n=from.begin(); n!=from.end(); n++)
+  for (auto& n: from)
     {
-      cell& nbr=dynamic_cast<cell&>(**n);
+      auto& nbr=dynamic_cast<const cell&>(*n);
       sum_nbr += nbr.my_value;
     }
   my_value = from.my_value + 0.1*(sum_nbr - from.size()*from.my_value);
@@ -93,18 +88,20 @@ void cell::update(const cell& from)
 
 void von::update()
 {
-  Prepare_Neighbours(true); /* make a copy of neighbouring objects
+  prepareNeighbours(true); /* make a copy of neighbouring objects
 				      onto the current thread */
-  omap back=objects;        // backing map
-  for(iterator i=begin(); i!=end(); i++)
-    dynamic_cast<cell&>(**i).update( dynamic_cast<cell&>(*back[i->ID]) );
+  Graph from;
+  from.objects=clone(objects);
+  from.rebuildPtrLists();
+  for(auto& i: *this)
+    dynamic_cast<cell&>(*i).update( dynamic_cast<cell&>(*from.objects[i.id()]) );
 }
 	
 double error(Graph& pGraph, unsigned int size)
 {
   double retval=0.0;
-  for (Ptrlist::iterator i=pGraph.begin(); i!=pGraph.end(); i++)
-    retval += fabs(dynamic_cast<cell&>(**i).my_value-0.5);
+  for (auto& i: pGraph)
+    retval += fabs(dynamic_cast<cell&>(*i).my_value-0.5);
   return retval;
 }
 

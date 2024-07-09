@@ -1,14 +1,12 @@
 MPI=
 DEBUGGING=
 OPT=
-# specify any additional map names here
-MAP=hmap
 PREFIX=$(HOME)/usr
-INCLUDES=-I../classdesc -I$(HOME)/usr/include -I/usr/local/include
+INCLUDES=-I. -I../classdesc -I$(HOME)/usr/include -I/usr/local/include
+VPATH+=../classdesc $(HOME)/usr/include /usr/local/include
 OBJS=gather.o prepare_neighbours.o partition.o
-ALLOBJS=$(OBJS:%.o=%.$(MAP)) $(OBJS:%.o=%.vmap)
 
-.SUFFIXES: .cc .o .d .cd .h .$(MAP) .vmap
+.SUFFIXES: .cc .o .d .cd .h 
 
 FLAGS+=$(INCLUDES) -DTR1
 LIBS+=-L$(HOME)/usr/lib -L/usr/local/lib -L/usr/lib -L. -lgraphcode
@@ -51,25 +49,14 @@ endif
 
 all: libgraphcode.a poisson_demo
 
-libgraphcode.a: $(ALLOBJS)
-	ar r $@ $(ALLOBJS)
+libgraphcode.a: $(OBJS)
+	ar r $@ $(OBJS)
 
 poisson_demo: poisson_demo.o mt19937b-int.o libgraphcode.a
 	$(LINK) $(FLAGS) $^ $(LIBS) -o $@
 
 test/testvmap: test/testvmap.o libgraphcode.a 
 	$(LINK) $(FLAGS) $^ $(LIBS) -o $@
-
-.SUFFIXES: .cc .c .h .d .o .$(MAP)
-
-.cc.$(MAP): 
-	rm -f $@
-	$(CPLUSPLUS) -c $(FLAGS) -DMAP=$(MAP) -o $@ $<
-
-.cc.vmap: 
-	rm -f $@
-
-	$(CPLUSPLUS) -c $(FLAGS) -DMAP=vmap -o $@ $<
 
 .cc.o:
 	$(CPLUSPLUS) -c $(FLAGS) -o $@ $<

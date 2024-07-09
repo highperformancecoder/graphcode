@@ -14,7 +14,7 @@
 #include "ecolab_epilogue.h"
 #endif
 
-namespace GRAPHCODE_NS
+namespace graphcode
 {
   using std::pair;
   using std::map;
@@ -44,7 +44,7 @@ namespace GRAPHCODE_NS
     }
 #endif
 
-  void Graph::Partition_Objects()
+  void Graph::partitionObjects()
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
     if (nprocs()==1) return;

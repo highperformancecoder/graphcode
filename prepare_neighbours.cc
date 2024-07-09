@@ -12,9 +12,9 @@
 #include "ecolab_epilogue.h"
 #endif
 
-namespace GRAPHCODE_NS 
+namespace graphcode 
 {
-  void Graph::Prepare_Neighbours(bool cache_requests)
+  void Graph::prepareNeighbours(bool cache_requests)
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;

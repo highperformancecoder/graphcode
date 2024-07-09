@@ -12,7 +12,7 @@
 #include "ecolab_epilogue.h"
 #endif
 
-namespace GRAPHCODE_NS
+namespace graphcode
 {
   void Graph::gather()
   {
