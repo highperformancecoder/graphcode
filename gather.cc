@@ -17,13 +17,12 @@ namespace graphcode
   void Graph::gather()
   {
 #ifdef MPI_SUPPORT
-    Ptrlist::iterator p;
     MPIbuf b; 
     if (myid()>0) 
-      for (p=begin(); p!=end(); p++) 
+      for (auto& p: *this) 
 	{
-	  b<<p->ID<<*p;  /* this sends ID twice ! */
-	  assert(!p->nullref());
+	  assert(p);
+	  b<<p.id()<<*p;
 	}
     b.gather(0);
     if (myid()==0)

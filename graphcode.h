@@ -9,27 +9,32 @@
 #ifndef GRAPHCODE_H
 #define GRAPHCODE_H
 
+#include <classdesc_access.h>
+#include <object.h>
+#include <pack_base.h>
+#include <pack_stl.h>
+
 #ifdef MPI_SUPPORT
 #include <classdescMP.h>
 
 #ifdef PARMETIS
 /* Metis stuff */
-extern "C" void METIS_PartGraphRecursive
-(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
- unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
- unsigned* edgecut, unsigned* part);
-extern "C" void METIS_PartGraphKway
-(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
- unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
- unsigned* edgecut, unsigned* part);
+//extern "C" void METIS_PartGraphRecursive
+//(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
+// unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
+// unsigned* edgecut, unsigned* part);
+//extern "C" void METIS_PartGraphKway
+//(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
+// unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
+// unsigned* edgecut, unsigned* part);
 
 #include <parmetis.h>
 #else
-typedef int idxtype;  /* just for defining dummy weight functions */
+typedef int idx_t;  /* just for defining dummy weight functions */
 #endif
 
 #else
-typedef int idxtype;  /* just for defining dummy weight functions */
+typedef int idx_t;  /* just for defining dummy weight functions */
 #endif  /* MPI_SUPPORT */
 
 #include <vector>
@@ -37,19 +42,10 @@ typedef int idxtype;  /* just for defining dummy weight functions */
 #include <algorithm>
 #include <iostream>
 
-#ifdef ECOLAB_LIB
-#include "TCL_obj_base.h"
-#endif
-
 #include <vector>
 #include <set>
 #include <algorithm>
 #include <iostream>
-
-#include <classdesc_access.h>
-#include <object.h>
-#include <pack_base.h>
-#include <pack_stl.h>
 
 namespace classdesc
 {
@@ -122,7 +118,7 @@ namespace graphcode
 
 
   class object;
-  using ObjectPtr=std::shared_ptr<object>;
+  using ObjectPtr=std::shared_ptr<classdesc::object>;
   using OMap=std::unordered_map<GraphID_t, ObjectPtr>;
   class Graph;
 
@@ -294,9 +290,9 @@ namespace graphcode
     object* cloneObject() const {return static_cast<object*>(clone());}
     /// allow exposure to scripting environments
     virtual void RESTProcess(classdesc::RESTProcess_t&,const classdesc::string&) {}
-    virtual idxtype weight() const {return 1;} ///< node's weight (for partitioning)
+    virtual idx_t weight() const {return 1;} ///< node's weight (for partitioning)
     /// weight for edge connecting \c *this to \a x
-    virtual idxtype edgeweight(const ObjRef& x) const {return 1;} 
+    virtual idx_t edgeweight(const ObjRef& x) const {return 1;} 
   };
 
   /// Curiously recursive template pattern to define classdesc'd methods
@@ -311,11 +307,27 @@ namespace graphcode
     }
   };
   
-  inline int ObjRef::proc() const {return payload? payload->second->proc: 0;}
-  inline object& ObjRef::operator*()  {assert(payload); return *payload->second;}
-  inline object* ObjRef::operator->() {assert(payload); return payload->second.get();}
-  inline const object& ObjRef::operator*() const {assert(payload); return *payload->second;}
-  inline const object* ObjRef::operator->() const {assert(payload); return payload->second.get();}
+  inline int ObjRef::proc() const {return payload? operator*().proc: 0;}
+  inline object& ObjRef::operator*()  {
+    assert(payload);
+    assert(dynamic_cast<object*>(payload->second.get()));
+    return static_cast<object&>(*payload->second);
+  }
+  inline object* ObjRef::operator->() {
+    assert(payload);
+    assert(dynamic_cast<object*>(payload->second.get()));
+    return static_cast<object*>(payload->second.get());
+  }
+  inline const object& ObjRef::operator*() const {
+    assert(payload);
+    assert(dynamic_cast<object*>(payload->second.get()));
+    return static_cast<object&>(*payload->second);
+  }
+  inline const object* ObjRef::operator->() const {
+    assert(payload);
+    assert(dynamic_cast<object*>(payload->second.get()));
+    return static_cast<object*>(payload->second.get());
+  }
   inline ObjRef::operator void*() const {return payload->second.get();}
 
   /// deep copy of \a x
@@ -323,7 +335,7 @@ namespace graphcode
   {
     OMap r;
     for (auto& i: x)
-      r.emplace(i.first, i.second->cloneObject());
+      r.emplace(i.first, ObjRef(i)->cloneObject());
     return r;
   }
   
@@ -358,8 +370,8 @@ namespace graphcode
       clear();
       for (auto& i: objects)
         {
-          if (i.second->proc==myid()) emplace_back(i);
-          i.second->updatePtrList(objects);
+          if (ObjRef(i).proc()==myid()) emplace_back(i);
+          ObjRef(i)->updatePtrList(objects);
         }
     }
 
@@ -370,10 +382,10 @@ namespace graphcode
     {
       set<GraphID_t> references;
       for (auto& i: objects)
-        if (i.second->proc==myid())
+        if (ObjRef(i).proc()==myid())
           {
             references.insert(i.first);
-            for (auto id: i.second->neighbours)
+            for (auto id: ObjRef(i)->neighbours)
               references.insert(id);
           }
       // now remove all unreferenced items
@@ -419,10 +431,10 @@ namespace graphcode
     */
     ObjRef AddNewObject(GraphID_t id, const ObjectPtr& o)
     {
-      auto i=objects.emplace(id, o).first;
-      i->second->type(); /* ensure type is registered */
-      assert(type_registered(*i->second));
-      return *i;
+      ObjRef i(*objects.emplace(id, o).first);
+      i->type(); /* ensure type is registered */
+      assert(type_registered(*i));
+      return i;
     }
 
     /** 
@@ -458,8 +470,8 @@ namespace graphcode
   {
 #ifdef MPI_SUPPORT
     rec_req.clear();
-    MPIbuf() << objectMap() << bcast(0) >> objectMap();
-    rebuild_local_list();
+    MPIbuf() << objects << bcast(0) >> objects;
+    rebuildPtrLists();
 #endif
   }
 
@@ -470,43 +482,30 @@ namespace graphcode
 //using GRAPHCODE_NS::unpack;
 
 #ifdef _CLASSDESC
-#pragma omit pack GRAPHCODE_NS::omap
-#pragma omit unpack GRAPHCODE_NS::omap
-#pragma omit isa GRAPHCODE_NS::omap
-#pragma omit pack GRAPHCODE_NS::omap::iterator
-#pragma omit unpack GRAPHCODE_NS::omap::iterator
-#pragma omit isa GRAPHCODE_NS::omap::iterator
-#pragma omit pack GRAPHCODE_NS::Ptrlist
-#pragma omit unpack GRAPHCODE_NS::Ptrlist
-#pragma omit pack GRAPHCODE_NS::Ptrlist::iterator
-#pragma omit unpack GRAPHCODE_NS::Ptrlist::iterator
-#pragma omit pack GRAPHCODE_NS::object
-#pragma omit unpack GRAPHCODE_NS::object
-#pragma omit pack GRAPHCODE_NS::objref
-#pragma omit unpack GRAPHCODE_NS::objref
-#pragma omit isa GRAPHCODE_NS::objref
+#pragma omit pack graphcode::object
+#pragma omit unpack graphcode::object
 #endif
  
-//namespace classdesc_access
-//{
-//  namespace cd=classdesc;
-//
-//  template <>
-//  struct access_pack<graphcode::object>
-//  {
-//    template <class U>
-//    void operator()(cd::pack_t& t,const cd::string& d, U& a)
-//    {pack(t,d,static_cast<const graphcode::Ptrlist&>(a));}
-//  };
-//
-//  template <>
-//  struct access_unpack<graphcode::object>
-//  {
-//    template <class U>
-//    void operator()(cd::pack_t& t,const cd::string& d, U& a)
-//    {unpack(t,d,cd::base_cast<graphcode::Ptrlist>::cast(a));}
-//  };
-//
+namespace classdesc_access
+{
+  namespace cd=classdesc;
+
+  template <>
+  struct access_pack<graphcode::object>
+  {
+    template <class U>
+    void operator()(cd::pack_t& t,const cd::string& d, U& a)
+    {a.pack(t);}
+  };
+
+  template <>
+  struct access_unpack<graphcode::object>
+  {
+    template <class U>
+    void operator()(cd::pack_t& t,const cd::string& d, U& a)
+    {a.unpack(t);}
+  };
+
 //  template <>
 //  struct access_pack<GRAPHCODE_NS::omap>
 //  {
@@ -627,7 +626,7 @@ namespace graphcode
 //      arg->unpack(targ);
 //    }
 //  };
-//}
+}
   
 #undef str
 #undef xstr

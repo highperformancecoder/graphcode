@@ -18,7 +18,7 @@ namespace graphcode
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
-    vector<vector<objref> > return_data(nprocs());
+    vector<vector<ObjRef> > return_data(nprocs());
     
     if (!cache_requests || rec_req.size()!=nprocs())
       {
@@ -28,10 +28,10 @@ namespace graphcode
 	requests.resize(nprocs());
         vector<set<GraphID_t> > uniq_req(nprocs());
 	/* build a list of ID requests to be sent to processors */
-	for (iterator obj1=begin(); obj1!=end(); obj1++)
-	  for (Ptrlist::iterator obj2=(*obj1)->begin(); obj2!=(*obj1)->end(); obj2++)
-	      if (obj2->proc!=myid())
-		uniq_req[obj2->proc].insert(obj2->ID);
+	for (auto& obj1:*this)
+	  for (auto& obj2: *obj1)
+            if (obj2.proc()!=myid())
+              uniq_req[obj2.proc()].insert(obj2.id());
 
 	/* now send & receive requests */
 	tag++;
@@ -67,6 +67,7 @@ namespace graphcode
 	for (unsigned i=0; i<requests[b.proc].size(); i++) 
 	  b>>objects[requests[b.proc][i]];
       }
+    rebuildPtrLists();
 #endif /* MPI_SUPPORT */
   }
 }

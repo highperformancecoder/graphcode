@@ -48,38 +48,36 @@ namespace graphcode
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
     if (nprocs()==1) return;
-    Prepare_Neighbours(); /* used for computing edgeweights */
+    prepareNeighbours(); /* used for computing edgeweights */
     unsigned i, j, nedges, nvertices=objects.size();
 
     /* ParMETIS needs vertices to be labelled contiguously on each processor */
     map<GraphID_t,unsigned int> pmap; 			
-    vector<idxtype> counts(nprocs()+1);
+    vector<idx_t> counts(nprocs()+1);
     for (i=0; i<=nprocs(); i++) 
       counts[i]=0;
 
     /* label each pin sequentially within processor */
-    omap::iterator pi;
-    for (pi=objects.begin(); pi!=objects.end(); pi++) 
-      pmap[pi->ID]=counts[pi->proc+1]++;
+    for (auto& pi: objects) 
+      pmap[pi.first]=counts[ObjRef(pi).proc()+1]++;
 
     /* counts becomes running sum of counts of local pins */
     for (i=1; i<nprocs(); i++) counts[i+1]+=counts[i];
 
     /* add offset for each processor to map */
-    for (pi=objects.begin(); pi!=objects.end(); pi++)  
-      pmap[pi->ID]+=counts[pi->proc];
+    for (auto& pi: objects)  
+      pmap[pi.first]+=counts[ObjRef(pi).proc()];
 
     /* construct a set of edges connected to each local vertex */
     vector<vector<unsigned> > nbrs(nvertices);
-    iterator p;
     {
       MPIbuf_array edgedist(nprocs());    
-      for (p=begin(); p!=end(); p++)
-	for (iterator n=(*p)->begin(); n!=(*p)->end(); n++)
+      for (auto& p: *this)
+	for (auto& n: *p)
 	  {
-	    if (n->ID==p->ID) continue; /* ignore self-links */
-	    nbrs[pmap[p->ID]].push_back(pmap[n->ID]);
-	    edgedist[n->proc] << pair<unsigned,unsigned>(pmap[n->ID],pmap[p->ID]);
+	    if (n.id()==p.id()) continue; /* ignore self-links */
+	    nbrs[pmap[p.id()]].push_back(pmap[n.id()]);
+	    edgedist[n.proc()] << pair<unsigned,unsigned>(pmap[n.id()],pmap[p.id()]);
 	  }
 
       /* Ensure reverse edge is in graph (Metis requires graphs to be undirected */
@@ -97,9 +95,9 @@ namespace graphcode
     for (int i=counts[myid()]; i<counts[myid()+1]; i++) 
       nedges+=nbrs[i].size();
 
-    vector<idxtype> offsets(size()+1);
-    vector<idxtype> edges(nedges);
-    vector<idxtype> partitioning(size());
+    vector<idx_t> offsets(size()+1);
+    vector<idx_t> edges(nedges);
+    vector<idx_t> partitioning(size());
 
     /* fill adjacency arrays suitable for call to METIS */
     offsets[0]=0; 
@@ -113,15 +111,20 @@ namespace graphcode
 
     int weightflag=3, numflag=0, nparts=nprocs(), edgecut, ncon=1;
     vector<float> tpwgts(nparts);
-    vector<idxtype> vwgts(size()), ewgts(nedges);
-    for (p=begin(), i=0; p!=end(); p++, i++) vwgts[i]=(*p)->weight();
+    vector<idx_t> vwgts(size()), ewgts(nedges);
+    i=0;
+    for (auto& p: *this) vwgts[i++]=p->weight();
     /* reverse pmap */
     vector<GraphID_t> rpmap(nvertices); 			
-    for (pi=objects.begin(); pi!=objects.end(); pi++) 
-      rpmap[pmap[pi->ID]]=pi->ID;
-    for (p=begin(), i=1, j=0; p!=end(); p++, i++) 
+    for (auto& pi: objects) 
+      rpmap[pmap[pi.first]]=pi.first;
+    i=1, j=0;
+    for (auto p=begin(); p!=end(); p++, i++) 
       for (; j<unsigned(offsets[i]); j++)
-	ewgts[j]=(*p)->edgeweight(objects[rpmap[(unsigned)edges[j]]]); 
+        {
+          auto otherNode=objects.find(rpmap[(unsigned)edges[j]]);
+          ewgts[j]=otherNode==objects.end()? 1: (*p)->edgeweight(*otherNode);
+        }
     for (i=0; i<unsigned(nparts); i++) tpwgts[i]=1.0/nparts;
     float ubvec[]={1.05};
     int options[]={0,0,0,0,0}; /* for production */
@@ -148,14 +151,13 @@ namespace graphcode
     /* prepare pins to be sent to remote processors */
     MPIbuf_array sendbuf(nprocs());
     MPIbuf pin_migrate_list;
-    for (p=begin(); p!=end(); p++)
+    for (auto& p:*this)
       {
-        p->proc=partitioning[pmap[p->ID]-counts[myid()]];
+        p->proc=partitioning[pmap[p.id()]-counts[myid()]];
 	if (p->proc!=myid()) 
 	  {
-	    sendbuf[p->proc]<<p->ID<<*p;
-	    p->nullify();
-	    pin_migrate_list << p->proc << p->ID;
+	    sendbuf[p->proc]<<p.id()<<*p;
+	    pin_migrate_list << p->proc << p.id();
 	  }
       }
 
@@ -175,7 +177,7 @@ namespace graphcode
     for (i=0; i<nprocs()-1; i++)
       {
 	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
-	objref pin; GraphID_t index;
+	GraphID_t index;
 	while (b.pos()<b.size()) 
 	  {
 	    b >> index;
@@ -191,9 +193,11 @@ namespace graphcode
       {
 	GraphID_t index; unsigned proc;
 	pin_migrate_list >> proc >> index;
-	objects[index].proc=proc;
+        auto o=objects.find(index);
+        if (o!=objects.end())
+          ObjRef(*o)->proc=proc;
       }
-    rebuild_local_list();
+    rebuildPtrLists();
 #endif
   }
 }
