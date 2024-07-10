@@ -121,6 +121,7 @@ namespace graphcode
   {
   public:
     ObjectPtr()=default;
+    ObjectPtr(GraphID_t id): std::shared_ptr<T>(std::make_shared<T>()) {(*this)->id=id;}
     ObjectPtr(T* x): std::shared_ptr<T>(x) {}
     ObjectPtr(const std::shared_ptr<T>& x): std::shared_ptr<T>(x) {}
   };
@@ -138,7 +139,7 @@ namespace graphcode
     
     ObjRef()=default;
     ObjRef(object& x): payload(&x) {}
-    template <class T> ObjRef(const ObjectPtr<T>& x): payload(x.get()) {}
+    template <class T> ObjRef(const std::shared_ptr<T>& x): payload(x.get()) {}
     object& operator*() {return *payload;}
     object* operator->() {return payload;}
     const object& operator*() const {return *payload;}
@@ -236,23 +237,29 @@ namespace graphcode
     size_t operator()(const ObjectPtr<T>& x) const {return x? std::hash<GraphID_t>()(x->id): 0;}
   };
   
-  template <class T> struct OMap: public std::unordered_set<ObjectPtr<T>, Hash<T>>
+  template <class T> struct KeyEqual
   {
-    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>>;
+    bool operator()(const ObjectPtr<T>& x, const ObjectPtr<T>& y) const {
+      return x&&y? x->id==y->id: false;}
+  };
+  
+  template <class T> struct OMap: public std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>
+  {
+    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
     using Super::erase;
     using Super::count;
     using Super::insert;
     typename Super::iterator find(GraphID_t id) {
-      T tmp; tmp.id=id; return Super::find(tmp);
+      ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
     typename Super::const_iterator find(GraphID_t id) const {
-      T tmp; tmp.id=id; return Super::find(tmp);
+      ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
     typename Super::iterator erase(GraphID_t id) {
-      T tmp; tmp.id=id; return Super::erase(tmp);
+      ObjectPtr<T> tmp(id); return Super::erase(tmp);
     }
     size_t count(GraphID_t id) const {
-      T tmp; tmp.id=id; return Super::count(tmp);
+      ObjectPtr<T> tmp(id); return Super::count(tmp);
     }
     ObjectPtr<T> operator[](GraphID_t id) {
       auto i=find(id);
@@ -365,7 +372,7 @@ namespace graphcode
       auto i=*(objects.emplace(o).first);
       i->type(); /* ensure type is registered */
       assert(type_registered(*i));
-      return *i;
+      return i;
     }
 
     /** 

@@ -80,7 +80,7 @@ void cell::update(const cell& from)
   double sum_nbr=0;
   for (auto& n: from)
     {
-      auto& nbr=dynamic_cast<const cell&>(*n);
+      auto& nbr=*n->as<cell>();
       sum_nbr += nbr.my_value;
     }
   my_value = from.my_value + 0.1*(sum_nbr - from.size()*from.my_value);
@@ -94,7 +94,7 @@ void von::update()
   from.objects=objects.deepCopy();
   from.rebuildPtrLists();
   for(auto& i: *this)
-    dynamic_cast<cell&>(*i).update( dynamic_cast<cell&>(*from.objects[i->id]) );
+    i->as<cell>()->update( *from.objects[i->id]);
 }
 	
 double error(Graph<cell>& pGraph, unsigned int size)
