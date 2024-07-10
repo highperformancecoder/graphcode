@@ -44,12 +44,10 @@ namespace graphcode
     }
 #endif
 
-  void partitionObjects(const PtrList& global, const PtrList& local)
+  void partitionObjects(const PtrList& global, PtrList& local, int& tag)
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
-    if (nprocs()==1) return;
-    prepareNeighbours(); /* used for computing edgeweights */
-    unsigned i, j, nedges, nvertices=objects.size();
+    unsigned i, j, nedges, nvertices=global.size();
 
     /* ParMETIS needs vertices to be labelled contiguously on each processor */
     map<GraphID_t,unsigned int> pmap; 			
@@ -65,7 +63,7 @@ namespace graphcode
     for (i=1; i<nprocs(); i++) counts[i+1]+=counts[i];
 
     /* add offset for each processor to map */
-    for (auto& pi: globa)  
+    for (auto& pi: global)  
       pmap[pi->id]+=counts[pi->proc];
 
     /* construct a set of edges connected to each local vertex */
@@ -77,7 +75,7 @@ namespace graphcode
 	  {
 	    if (n->id==p->id) continue; /* ignore self-links */
 	    nbrs[pmap[p->id]].push_back(pmap[n->id]);
-	    edgedist[n->proc] << make_pair(pmap[n->id],pmap[p->id]);
+	    edgedist[n->proc] << std::make_pair(pmap[n->id],pmap[p->id]);
 	  }
 
       /* Ensure reverse edge is in graph (Metis requires graphs to be undirected */
@@ -95,9 +93,9 @@ namespace graphcode
     for (int i=counts[myid()]; i<counts[myid()+1]; i++) 
       nedges+=nbrs[i].size();
 
-    vector<idx_t> offsets(size()+1);
+    vector<idx_t> offsets(global.size()+1);
     vector<idx_t> edges(nedges);
-    vector<idx_t> partitioning(size());
+    vector<idx_t> partitioning(local.size());
 
     /* fill adjacency arrays suitable for call to METIS */
     offsets[0]=0; 
@@ -111,7 +109,7 @@ namespace graphcode
 
     int weightflag=3, numflag=0, nparts=nprocs(), edgecut, ncon=1;
     vector<float> tpwgts(nparts);
-    vector<idx_t> vwgts(size()), ewgts(nedges);
+    vector<idx_t> vwgts(local.size()), ewgts(nedges);
     i=0;
     for (auto& p: local) vwgts[i++]=p->weight();
     /* reverse pmap */
@@ -120,10 +118,9 @@ namespace graphcode
       rpmap[pmap[pi->id]]=pi->id;
     i=1, j=0;
     for (auto p=local.begin(); p!=local.end(); p++, i++) 
-      for (; j<unsigned(offsets[i]); j++)
+      for (auto otherNode=(*p)->begin(); j<unsigned(offsets[i]); ++j, ++otherNode)
         {
-          auto otherNode=objects.find(rpmap[(unsigned)edges[j]]);
-          ewgts[j]=otherNode==objects.end()? 1: (*p)->edgeweight(*otherNode);
+          ewgts[j]=(*p)->edgeweight(**otherNode);
         }
     for (i=0; i<unsigned(nparts); i++) tpwgts[i]=1.0/nparts;
     float ubvec[]={1.05};
@@ -133,8 +130,6 @@ namespace graphcode
     ParMETIS_V3_PartKway(counts.data(),offsets.data(),edges.data(),vwgts.data(),ewgts.data(),
 			&weightflag,&numflag,&ncon,&nparts,tpwgts.data(),ubvec,options,
 			&edgecut,partitioning.data(),&comm);
-
-    rec_req.clear(); /* destroy record of previous communication patterns */
 
 #if 0
     /* this simple minded code updates processor locations, pulls all
@@ -149,8 +144,8 @@ namespace graphcode
 #endif
 
     /* prepare pins to be sent to remote processors */
-    for (auto& p:*this)
-      p->proc=partitioning[pmap[p.id()]-counts[myid()]];
+    for (auto& p:local)
+      p->proc=partitioning[pmap[p->id]-counts[myid()]];
 
 #endif
   }

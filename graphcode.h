@@ -261,14 +261,15 @@ namespace graphcode
     size_t count(GraphID_t id) const {
       ObjectPtr<T> tmp(id); return Super::count(tmp);
     }
-    ObjectPtr<T> operator[](GraphID_t id) {
+    ObjectPtr<T>& operator[](GraphID_t id) {
       auto i=find(id);
       if (i==this->end()) {
-        ObjectPtr<T> x(std::make_shared<T>());
+        ObjectPtr<T> x(id);
         x->id=id;
-        return *insert(x).first;
+        i=insert(x).first;
       }
-      return *i;
+      // note this leaves the id field mutable, which is not right
+      return const_cast<ObjectPtr<T>&>(*i);
     }
     const ObjectPtr<T>& operator[](GraphID_t id) const {
         auto& i=find(id);
@@ -422,7 +423,7 @@ namespace graphcode
       for (auto& p: *this) 
 	{
 	  assert(p);
-	  b<<p.id()<<*p;
+	  b<<p->id<<*p;
 	}
     b.gather(0);
     if (myid()==0)
@@ -453,8 +454,8 @@ namespace graphcode
 	/* build a list of ID requests to be sent to processors */
 	for (auto& obj1:*this)
 	  for (auto& obj2: *obj1)
-            if (obj2.proc()!=myid())
-              uniq_req[obj2.proc()].insert(obj2.id());
+            if (obj2->proc!=myid())
+              uniq_req[obj2->proc].insert(obj2->id);
 
 	/* now send & receive requests */
 	tag++;
@@ -494,7 +495,7 @@ namespace graphcode
 #endif /* MPI_SUPPORT */
   }
 
-  void partitionObjects(const PtrList& global, const PtrList& local);
+  void partitionObjects(const PtrList& global, PtrList& local);
   
   template <class T>
   inline void Graph<T>::partitionObjects()
@@ -502,7 +503,9 @@ namespace graphcode
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
     prepareNeighbours(); /* used for computing edgeweights */
-    partitionObjects(PtrList(objects.begin(), objects.end()), *this);
+    partitionObjects(PtrList(objects.begin(), objects.end()), *this, tag);
+    rec_req.clear(); /* destroy record of previous communication patterns */
+
     /* prepare pins to be sent to remote processors */
     MPIbuf_array sendbuf(nprocs());
     MPIbuf pin_migrate_list;
@@ -521,14 +524,14 @@ namespace graphcode
     /* send pins to remote processors */
     tag++;
 
-    for (i=0; i<nprocs(); i++)
+    for (int i=0; i<nprocs(); i++)
       {
 	if (i==myid()) continue;
 	sendbuf[i].isend(i,tag);
       }
 
     /* receive pins from remote processors */
-    for (i=0; i<nprocs()-1; i++)
+    for (int i=0; i<nprocs()-1; i++)
       {
 	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
 	GraphID_t index;
