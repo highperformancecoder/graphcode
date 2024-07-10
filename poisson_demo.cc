@@ -41,13 +41,13 @@ struct makeID_t
 
 void print(ObjRef& x)
 {
-  std::cout << x.id() << " is connected to ";
+  std::cout << x->id << " is connected to ";
   for (auto& j: *x)
-    std::cout << j.id() << " ";
+    std::cout << j->id << " ";
   std::cout << std::endl;
 };
 
-class von: public Graph
+class von: public Graph<cell>
 {
 public:
   void setup(int size);
@@ -72,7 +72,7 @@ void von::setup(int size)
         o->neighbours.push_back(makeID(i,j+1)); 
       }                                         
   rebuildPtrLists();
-  partitionObjects();
+//  partitionObjects();
 }
 
 void cell::update(const cell& from)
@@ -91,17 +91,17 @@ void von::update()
   prepareNeighbours(true); /* make a copy of neighbouring objects
 				      onto the current thread */
   Graph from;
-  from.objects=clone(objects);
+  from.objects=objects.deepCopy();
   from.rebuildPtrLists();
   for(auto& i: *this)
-    dynamic_cast<cell&>(*i).update( dynamic_cast<cell&>(*from.objects[i.id()]) );
+    dynamic_cast<cell&>(*i).update( dynamic_cast<cell&>(*from.objects[i->id]) );
 }
 	
-double error(Graph& pGraph, unsigned int size)
+double error(Graph<cell>& pGraph, unsigned int size)
 {
   double retval=0.0;
   for (auto& i: pGraph)
-    retval += fabs(dynamic_cast<cell&>(*i).my_value-0.5);
+    retval += fabs(i->as<cell>()->my_value-0.5);
   return retval;
 }
 

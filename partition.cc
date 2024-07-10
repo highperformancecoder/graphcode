@@ -44,7 +44,7 @@ namespace graphcode
     }
 #endif
 
-  void Graph::partitionObjects()
+  void partitionObjects(const PtrList& global, const PtrList& local)
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
     if (nprocs()==1) return;
@@ -58,26 +58,26 @@ namespace graphcode
       counts[i]=0;
 
     /* label each pin sequentially within processor */
-    for (auto& pi: objects) 
-      pmap[pi.first]=counts[ObjRef(pi).proc()+1]++;
+    for (auto& pi: global) 
+      pmap[pi->id]=counts[pi->proc+1]++;
 
     /* counts becomes running sum of counts of local pins */
     for (i=1; i<nprocs(); i++) counts[i+1]+=counts[i];
 
     /* add offset for each processor to map */
-    for (auto& pi: objects)  
-      pmap[pi.first]+=counts[ObjRef(pi).proc()];
+    for (auto& pi: globa)  
+      pmap[pi->id]+=counts[pi->proc];
 
     /* construct a set of edges connected to each local vertex */
     vector<vector<unsigned> > nbrs(nvertices);
     {
       MPIbuf_array edgedist(nprocs());    
-      for (auto& p: *this)
+      for (auto& p: local)
 	for (auto& n: *p)
 	  {
-	    if (n.id()==p.id()) continue; /* ignore self-links */
-	    nbrs[pmap[p.id()]].push_back(pmap[n.id()]);
-	    edgedist[n.proc()] << pair<unsigned,unsigned>(pmap[n.id()],pmap[p.id()]);
+	    if (n->id==p->id) continue; /* ignore self-links */
+	    nbrs[pmap[p->id]].push_back(pmap[n->id]);
+	    edgedist[n->proc] << make_pair(pmap[n->id],pmap[p->id]);
 	  }
 
       /* Ensure reverse edge is in graph (Metis requires graphs to be undirected */
@@ -104,8 +104,8 @@ namespace graphcode
     nedges=0;
     for (int i=counts[myid()]; i<counts[myid()+1]; i++)
       {
-	for (vector<unsigned>::iterator j=nbrs[i].begin(); j!=nbrs[i].end(); j++)
-	    edges[nedges++]=*j;
+	for (auto& j: nbrs[i])
+          edges[nedges++]=j;
 	offsets[i-counts[myid()]+1]=nedges;
       }
 
@@ -113,13 +113,13 @@ namespace graphcode
     vector<float> tpwgts(nparts);
     vector<idx_t> vwgts(size()), ewgts(nedges);
     i=0;
-    for (auto& p: *this) vwgts[i++]=p->weight();
+    for (auto& p: local) vwgts[i++]=p->weight();
     /* reverse pmap */
     vector<GraphID_t> rpmap(nvertices); 			
-    for (auto& pi: objects) 
-      rpmap[pmap[pi.first]]=pi.first;
+    for (auto& pi: global) 
+      rpmap[pmap[pi->id]]=pi->id;
     i=1, j=0;
-    for (auto p=begin(); p!=end(); p++, i++) 
+    for (auto p=local.begin(); p!=local.end(); p++, i++) 
       for (; j<unsigned(offsets[i]); j++)
         {
           auto otherNode=objects.find(rpmap[(unsigned)edges[j]]);
@@ -140,7 +140,7 @@ namespace graphcode
     /* this simple minded code updates processor locations, pulls all
        data to the master, then redistributes - replaces the more
        complex code after the #if 0, which doesn't seem to work ... */
-    for (p=begin(); p!=end(); p++)
+    for (auto& p: local)
       p->proc=partitioning[pmap[p->ID]-counts[myid()]];
       
     gather();
@@ -149,55 +149,9 @@ namespace graphcode
 #endif
 
     /* prepare pins to be sent to remote processors */
-    MPIbuf_array sendbuf(nprocs());
-    MPIbuf pin_migrate_list;
     for (auto& p:*this)
-      {
-        p->proc=partitioning[pmap[p.id()]-counts[myid()]];
-	if (p->proc!=myid()) 
-	  {
-	    sendbuf[p->proc]<<p.id()<<*p;
-	    pin_migrate_list << p->proc << p.id();
-	  }
-      }
+      p->proc=partitioning[pmap[p.id()]-counts[myid()]];
 
-    /* clear list of local pins, then add back those remining locally */
-    //    for (clear(), i=0; i<stayput.size(); i++) push_back(stayput[i]);
-
-    /* send pins to remote processors */
-    tag++;
-
-    for (i=0; i<nprocs(); i++)
-      {
-	if (i==myid()) continue;
-	sendbuf[i].isend(i,tag);
-      }
-
-    /* receive pins from remote processors */
-    for (i=0; i<nprocs()-1; i++)
-      {
-	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
-	GraphID_t index;
-	while (b.pos()<b.size()) 
-	  {
-	    b >> index;
-	    b >> objects[index];
-	  }
-      }
-
- 
-   /* update proc records on all prcoessors */
-    pin_migrate_list.gather(0);
-    pin_migrate_list.bcast(0);
-    while (pin_migrate_list.pos() < pin_migrate_list.size())
-      {
-	GraphID_t index; unsigned proc;
-	pin_migrate_list >> proc >> index;
-        auto o=objects.find(index);
-        if (o!=objects.end())
-          ObjRef(*o)->proc=proc;
-      }
-    rebuildPtrLists();
 #endif
   }
 }

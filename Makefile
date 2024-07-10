@@ -4,14 +4,26 @@ OPT=
 PREFIX=$(HOME)/usr
 INCLUDES=-I. -I../classdesc -I$(HOME)/usr/include -I/usr/local/include
 VPATH+=../classdesc $(HOME)/usr/include /usr/local/include
-OBJS=gather.o prepare_neighbours.o partition.o
+#OBJS=gather.o prepare_neighbours.o partition.o
+OBJS=partition.o
 
 .SUFFIXES: .cc .o .d .cd .h 
 
 FLAGS+=$(INCLUDES) -DTR1
 LIBS+=-L$(HOME)/usr/lib -L/usr/local/lib -L/usr/lib -L. -lgraphcode
 
+# insert a pause just after MPI_Init to attach debuggers (eg gdb) to processes.
+ifdef MPI_DEBUG
+FLAGS+=-DMPI_DEBUG
+DEBUG=1
+MPI=1
+endif
+
 ifdef DEBUGGING
+DEBUG=1
+endif
+
+ifdef DEBUG
 FLAGS+=-g
 else
 OPT=-O3
@@ -32,6 +44,7 @@ LIBS+=-lparmetis -lmetis
 FLAGS+=-DPARMETIS
 LINK=$(CPLUSPLUS)
 CPP=$(CPLUSPLUS) -E
+
 
 # disable inclusion of mpi++.h in the MPICH case (don't know what the problem is here)
 FLAGS+=-DMPI_SUPPORT -UHAVE_MPI_CPP
