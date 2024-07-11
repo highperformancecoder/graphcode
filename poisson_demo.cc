@@ -70,9 +70,9 @@ void von::setup(int size)
         o->neighbours.push_back(makeID(i+1,j)); 
         o->neighbours.push_back(makeID(i,j-1)); 
         o->neighbours.push_back(makeID(i,j+1)); 
-      }                                         
+      }
+  
   rebuildPtrLists();
-//  partitionObjects();
 }
 
 void cell::update(const cell& from)
@@ -97,11 +97,19 @@ void von::update()
     i->as<cell>()->update( *from.objects[i.id()]);
 }
 	
-double error(Graph<cell>& pGraph, unsigned int size)
+double localError(Graph<cell>& pGraph, unsigned int size)
 {
   double retval=0.0;
   for (auto& i: pGraph)
     retval += fabs(i->as<cell>()->my_value-0.5);
+  return retval;
+}
+
+double error(Graph<cell>& pGraph, unsigned int size)
+{
+  double retval=0.0;
+  for (auto& i: pGraph.objects)
+    retval += fabs(i->my_value-0.5);
   return retval;
 }
 
@@ -131,21 +139,30 @@ int main(int argc, char** argv)
 
   g.setup(testsize);
 
+  // In this case, objects are created insitu, so neither of the
+  // following methods are needed. They are included just to exercise
+  // them for unit test purposes
+  g.partitionObjects();
+  g.distributeObjects();
+
   g.gather();
   double starterror=error(g, testsize);
 
   for(int t=0; t<niter; t++)
     {
 #ifndef SILENT
-      g.gather();
       printf("On node %d: time is: %d, error is: %5.10f, updating...\n", 
-	     myid(), t, error(g, testsize));
+	     myid(), t, localError(g, testsize));
 #endif
       g.update();
     }
 
   g.gather();
-  if (myid()==0 && error(g, testsize)/ starterror >0.2) return 1; 
+  if (myid()==0)
+    {
+      cout << "Total error="<<error(g, testsize)<<endl;
+      if (error(g, testsize)/ starterror >0.2) return 1;
+    }
   return 0;
 }
 

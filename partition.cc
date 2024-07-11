@@ -44,7 +44,7 @@ namespace graphcode
     }
 #endif
 
-  void partitionObjects(const PtrList& global, PtrList& local, int& tag)
+  void partitionObjectsImpl(const PtrList& global, PtrList& local, unsigned& tag)
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
     unsigned i, j, nedges, nvertices=global.size();
@@ -131,22 +131,12 @@ namespace graphcode
 			&weightflag,&numflag,&ncon,&nparts,tpwgts.data(),ubvec,options,
 			&edgecut,partitioning.data(),&comm);
 
-#if 0
-    /* this simple minded code updates processor locations, pulls all
-       data to the master, then redistributes - replaces the more
-       complex code after the #if 0, which doesn't seem to work ... */
-    for (auto& p: local)
-      p->proc=partitioning[pmap[p->ID]-counts[myid()]];
-      
-    gather();
-    Distribute_Objects();
-    return;
-#endif
-
     /* prepare pins to be sent to remote processors */
     for (auto& p:local)
-      p.proc(partitioning[pmap[p.id()]-counts[myid()]]);
-
+      {
+        p.proc(partitioning[pmap[p.id()]-counts[myid()]]);
+        assert(p.proc()<nprocs());
+      }
 #endif
   }
 }

@@ -168,7 +168,7 @@ namespace graphcode
   {
     PtrList()=default;
     PtrList(const PtrList&) {}
-    template <class I> PtrList(I begin, I end) {}
+    template <class I> PtrList(I begin, I end): std::vector<ObjRef>(begin,end) {}
     PtrList& operator=(const PtrList&) {return *this;}
   };
   
@@ -500,26 +500,36 @@ namespace graphcode
 #endif /* MPI_SUPPORT */
   }
 
-  void partitionObjects(const PtrList& global, PtrList& local);
+  void partitionObjectsImpl(const PtrList&, PtrList&, unsigned&);
   
   template <class T>
   inline void Graph<T>::partitionObjects()
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
+    rebuildPtrLists();
     prepareNeighbours(); /* used for computing edgeweights */
-    partitionObjects(PtrList(objects.begin(), objects.end()), *this, tag);
+    partitionObjectsImpl(PtrList(objects.begin(), objects.end()), *this, tag);
     rec_req.clear(); /* destroy record of previous communication patterns */
+
+#if 0
+    /* this simple minded code updates processor locations, pulls all
+       data to the master, then redistributes - replaces the more
+       complex code after the #if 0, which doesn't seem to work ... */      
+    gather();
+    distributeObjects();
+    return;
+#endif
 
     /* prepare pins to be sent to remote processors */
     MPIbuf_array sendbuf(nprocs());
     MPIbuf pin_migrate_list;
     for (auto& p:*this)
       {
-	if (p->proc!=myid()) 
+	if (p.proc()!=myid()) 
 	  {
-	    sendbuf[p->proc]<<p.id()<<*p;
-	    pin_migrate_list << p->proc << p.id();
+	    sendbuf[p.proc()]<<p.id()<<static_cast<ObjectPtrBase>(p);
+	    pin_migrate_list << p.proc() << p.id();
 	  }
       }
 
@@ -555,9 +565,11 @@ namespace graphcode
       {
 	GraphID_t index; unsigned proc;
 	pin_migrate_list >> proc >> index;
+        assert(proc<nprocs());
         auto o=objects.find(index);
         if (o!=objects.end())
-          o->proc=proc;
+          // const cast OK here, as only the id field is sacrosanct
+          const_cast<ObjectPtr<T>&>(*o).proc=proc;
       }
     rebuildPtrLists();
 #endif /* MPI_SUPPORT */
@@ -567,22 +579,14 @@ namespace graphcode
 #ifdef _CLASSDESC
 #pragma omit pack graphcode::ObjectPtrBase
 #pragma omit unpack graphcode::ObjectPtrBase
-#pragma omit pack graphcode::object
-#pragma omit unpack graphcode::object
+#pragma omit pack graphcode::OMap
+#pragma omit unpack graphcode::OMap
 #endif
 
 namespace classdesc_access
 {
   namespace cd=classdesc;
 
-  template <>
-  struct access_pack<graphcode::object>:
-    public cd::NullDescriptor<cd::pack_t> {};
-
-  template <>
-  struct access_unpack<graphcode::object>:
-    public cd::NullDescriptor<cd::pack_t> {};
-  
   template <>
   struct access_pack<graphcode::ObjectPtrBase> {
     template <class U>
@@ -598,6 +602,40 @@ namespace classdesc_access
     void operator()(cd::unpack_t& p, const cd::string& d, graphcode::ObjectPtrBase& a)
     {
       p>>a.proc>>static_cast<std::shared_ptr<graphcode::object>&>(a);
+    }
+    void operator()(cd::unpack_t& p, const cd::string& d, const graphcode::ObjectPtrBase& a)
+    {
+      graphcode::ObjectPtrBase tmp;
+      (*this)(p,d,tmp);
+    }
+  };
+  
+  template <class T>
+  struct access_pack<graphcode::OMap<T>> {
+    template <class U>
+    void operator()(cd::pack_t& p, const cd::string& d, U& a)
+    {
+      for (auto& i: a)
+        p<<i.id()<<i;
+    }
+  };
+
+  template <class T>
+  struct access_unpack<graphcode::OMap<T>>
+  {
+    void operator()(cd::unpack_t& p, const cd::string& d, graphcode::OMap<T>& a)
+    {
+      while (p)
+        {
+          graphcode::GraphID_t id;
+          p>>id;
+          p>>a[id];
+        }
+    }
+    void operator()(cd::unpack_t& p, const cd::string& d, const graphcode::OMap<T>&)
+    {
+      graphcode::OMap<T> tmp;
+      (*this)(p,d,tmp);
     }
   };
 }
