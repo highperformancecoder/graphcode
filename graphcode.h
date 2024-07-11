@@ -58,7 +58,7 @@ namespace graphcode
   typedef unsigned long GraphID_t;
   /** a pin with ID==bad_ID cannot be inserted into a map or wire 
    - can be used for handling boundary conditions during graph construction */
-  const GraphID_t bad_ID=~0UL;
+  const GraphID_t badId=~0UL;
 
   using std::vector;
   using std::map;
@@ -116,35 +116,44 @@ namespace graphcode
       return val;
   }
 
-
-  template <class T> class ObjectPtr: public std::shared_ptr<T>
-  {
-  public:
-    ObjectPtr()=default;
-    ObjectPtr(GraphID_t id): std::shared_ptr<T>(std::make_shared<T>()) {(*this)->id=id;}
-    ObjectPtr(T* x): std::shared_ptr<T>(x) {}
-    ObjectPtr(const std::shared_ptr<T>& x): std::shared_ptr<T>(x) {}
-  };
-  
-  //class Graph;
   class object;
 
+  class ObjectPtrBase: public std::shared_ptr<object>
+  {
+    GraphID_t m_id;
+  public:
+    GraphID_t id() const {return m_id;}
+    int proc=0;
+    ObjectPtrBase(GraphID_t id=badId, const std::shared_ptr<object>& x=nullptr):
+      m_id(id), std::shared_ptr<object>(x) {}
+    ObjectPtrBase(GraphID_t id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+  };
+
+  template <class T> class ObjectPtr: public ObjectPtrBase
+  {
+  public:
+    ObjectPtr(GraphID_t id=badId, const std::shared_ptr<T>& x=nullptr):
+      ObjectPtrBase(id, x) {}
+    ObjectPtr(GraphID_t id, std::shared_ptr<T>&& x): ObjectPtrBase(id, x) {}
+    T& operator*() const {return static_cast<T&>(ObjectPtrBase::operator*());}
+    T* operator->() const {return static_cast<T*>(ObjectPtrBase::operator->());}
+  };
+  
   /* base object of graphcode - can be a pin or a wire - whatever */
   /** Reference to an object type */
   class ObjRef
   {
     
-    object *payload=nullptr; /* referenced data */
+    ObjectPtrBase *payload=nullptr; /* referenced data */
   public:
-    
     ObjRef()=default;
-    ObjRef(object& x): payload(&x) {}
-    template <class T> ObjRef(const std::shared_ptr<T>& x): payload(x.get()) {}
-    object& operator*() {return *payload;}
-    object* operator->() {return payload;}
-    const object& operator*() const {return *payload;}
-    const object* operator->() const {return payload;}
-    operator void*() const {return payload;}
+    ObjRef(const ObjectPtrBase& x): payload(const_cast<ObjectPtrBase*>(&x)) {}
+    GraphID_t id() {return payload? payload->id(): badId;}
+    int proc() const {return payload? payload->proc: 0;}
+    int proc(int p) {if (payload) payload->proc=p; return proc();}
+    object& operator*() const {return **payload;}
+    object* operator->() const {return payload->get();}
+    operator bool() const {return payload && *payload;}
   };
 
   /**
@@ -170,8 +179,6 @@ namespace graphcode
   class object: public Exclude<PtrList>, public classdesc::object
   {
   public:
-    GraphID_t id;
-    int proc;
     std::vector<GraphID_t> neighbours;
     /// construct the internal pointer-based neighbour list, given the list of neighbours in \a neighbours
     template <class OMap> void updatePtrList(const OMap& o) {
@@ -234,13 +241,13 @@ namespace graphcode
 
   template <class T> struct Hash
   {
-    size_t operator()(const ObjectPtr<T>& x) const {return x? std::hash<GraphID_t>()(x->id): 0;}
+    size_t operator()(const ObjectPtr<T>& x) const {return std::hash<GraphID_t>()(x.id());}
   };
   
   template <class T> struct KeyEqual
   {
     bool operator()(const ObjectPtr<T>& x, const ObjectPtr<T>& y) const {
-      return x&&y? x->id==y->id: false;}
+      return x.id()==y.id();}
   };
   
   template <class T> struct OMap: public std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>
@@ -262,14 +269,8 @@ namespace graphcode
       ObjectPtr<T> tmp(id); return Super::count(tmp);
     }
     ObjectPtr<T>& operator[](GraphID_t id) {
-      auto i=find(id);
-      if (i==this->end()) {
-        ObjectPtr<T> x(id);
-        x->id=id;
-        i=insert(x).first;
-      }
-      // note this leaves the id field mutable, which is not right
-      return const_cast<ObjectPtr<T>&>(*i);
+      // const_cast OK because id() is immutable
+      return const_cast<ObjectPtr<T>&>(*Super::emplace(id).first);
     }
     const ObjectPtr<T>& operator[](GraphID_t id) const {
         auto& i=find(id);
@@ -279,7 +280,7 @@ namespace graphcode
     OMap deepCopy() {
       OMap r;
       for (auto& x: *this)
-        r.emplace(x->template cloneObject<T>());
+        r.insert(ObjectPtr<T>(x.id(), std::shared_ptr<T>(x->template cloneObject<T>())));
       return r;
     }
   };
@@ -308,7 +309,7 @@ namespace graphcode
       for (auto& i: objects)
         {
           assert(i);
-          if (i->proc==myid()) emplace_back(*i);
+          if (i.proc==myid()) emplace_back(i);
           i->updatePtrList(objects);
         }
     }
@@ -367,9 +368,8 @@ namespace graphcode
     /** 
         add the specified object into the Graph, if not already present
     */
-    ObjRef AddNewObject(GraphID_t id, const ObjectPtr<T>& o)
+    ObjRef AddNewObject(const ObjectPtr<T>& o)
     {
-      o->id=id;
       auto i=*(objects.emplace(o).first);
       i->type(); /* ensure type is registered */
       assert(type_registered(*i));
@@ -381,11 +381,12 @@ namespace graphcode
     */
 
     
-    ObjRef AddObject(GraphID_t id, const ObjectPtr<T>& o)
+    ObjRef AddObject(const ObjectPtr<T>& o)
     {
-      auto i=objects.find(id);
+      auto i=objects.find(o->id);
       if (i==objects.end())
-        return AddNewObject(id,o);
+        return AddNewObject(o);
+      *i=o;
       return *i;
     }
   
@@ -398,7 +399,7 @@ namespace graphcode
     {
       auto i=objects.find(id);
       if (i==objects.end())
-        return AddNewObject(id, std::make_shared<U>(std::forward<Args>(args)...));
+        return AddNewObject(ObjectPtr<T>(id, std::make_shared<U>(std::forward<Args>(args)...)));
       return **i;
     }
   };		   
@@ -560,6 +561,8 @@ namespace graphcode
 }
   
 #ifdef _CLASSDESC
+#pragma omit pack graphcode::ObjectPtrBase
+#pragma omit unpack graphcode::ObjectPtrBase
 #pragma omit pack graphcode::object
 #pragma omit unpack graphcode::object
 #endif

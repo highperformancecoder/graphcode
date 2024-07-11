@@ -41,9 +41,9 @@ struct makeID_t
 
 void print(ObjRef& x)
 {
-  std::cout << x->id << " is connected to ";
+  std::cout << x.id() << " is connected to ";
   for (auto& j: *x)
-    std::cout << j->id << " ";
+    std::cout << j.id() << " ";
   std::cout << std::endl;
 };
 
@@ -65,7 +65,7 @@ void von::setup(int size)
     for(i=0; i<size; i++)
       {
 	ObjRef o=AddObject<cell>(makeID(i,j));
-        o->proc=(i*xprocs) / size + (j*yprocs)/size*xprocs;
+        o.proc((i*xprocs) / size + (j*yprocs)/size*xprocs);
         o->neighbours.push_back(makeID(i-1,j)); 
         o->neighbours.push_back(makeID(i+1,j)); 
         o->neighbours.push_back(makeID(i,j-1)); 
@@ -94,7 +94,7 @@ void von::update()
   from.objects=objects.deepCopy();
   from.rebuildPtrLists();
   for(auto& i: *this)
-    i->as<cell>()->update( *from.objects[i->id]);
+    i->as<cell>()->update( *from.objects[i.id()]);
 }
 	
 double error(Graph<cell>& pGraph, unsigned int size)
