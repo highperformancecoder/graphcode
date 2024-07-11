@@ -64,7 +64,7 @@ void von::setup(int size)
   for(j=0; j<size; j++)
     for(i=0; i<size; i++)
       {
-	ObjRef o=AddObject<cell>(makeID(i,j));
+	ObjRef o=insertObject<>(makeID(i,j));
         o.proc((i*xprocs) / size + (j*yprocs)/size*xprocs);
         o->neighbours.push_back(makeID(i-1,j)); 
         o->neighbours.push_back(makeID(i+1,j)); 
@@ -112,8 +112,6 @@ int main(int argc, char** argv)
 
 #ifdef MPI_SUPPORT
   MPISPMD c(argc,argv);
-//  if (myid()==0) getchar();
-//  MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
   if (argc<3) 

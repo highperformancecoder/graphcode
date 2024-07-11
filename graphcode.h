@@ -118,7 +118,7 @@ namespace graphcode
 
   class object;
 
-  class ObjectPtrBase: public std::shared_ptr<object>
+  class ObjectPtrBase: public std::shared_ptr<graphcode::object>
   {
     GraphID_t m_id;
   public:
@@ -148,12 +148,13 @@ namespace graphcode
   public:
     ObjRef()=default;
     ObjRef(const ObjectPtrBase& x): payload(const_cast<ObjectPtrBase*>(&x)) {}
-    GraphID_t id() {return payload? payload->id(): badId;}
+    GraphID_t id() const {return payload? payload->id(): badId;}
     int proc() const {return payload? payload->proc: 0;}
     int proc(int p) {if (payload) payload->proc=p; return proc();}
     object& operator*() const {return **payload;}
     object* operator->() const {return payload->get();}
     operator bool() const {return payload && *payload;}
+    operator ObjectPtrBase() const {return *payload;}
   };
 
   /**
@@ -274,7 +275,7 @@ namespace graphcode
     }
     const ObjectPtr<T>& operator[](GraphID_t id) const {
         auto& i=find(id);
-        if (i==this->end()) return nullptr;
+        if (i==this->end()) return badId;
         return *i;
     }
     OMap deepCopy() {
@@ -368,9 +369,9 @@ namespace graphcode
     /** 
         add the specified object into the Graph, if not already present
     */
-    ObjRef AddNewObject(const ObjectPtr<T>& o)
+    ObjRef insertObject(const ObjectPtr<T>& o)
     {
-      auto i=*(objects.emplace(o).first);
+      auto& i=*(objects.emplace(o).first);
       i->type(); /* ensure type is registered */
       assert(type_registered(*i));
       return i;
@@ -381,25 +382,27 @@ namespace graphcode
     */
 
     
-    ObjRef AddObject(const ObjectPtr<T>& o)
+    ObjRef overwriteObject(const ObjectPtr<T>& o)
     {
       auto i=objects.find(o->id);
       if (i==objects.end())
-        return AddNewObject(o);
+        return insertObject(o);
       *i=o;
       return *i;
     }
   
     /**
-       add a object of type T if none already present:
-       - use as graph.AddObject<foo>(id);
+       add an object of type U if none already present:
+       - use as graph.AddObject<foo>(id, args...);
+         where args... are any arguments required by foo's constructor
+       - does not create new object if one is already present
     */
-    template <class U, class... Args>
-    ObjRef AddObject(GraphID_t id, Args... args) 
+    template <class U=T, class... Args>
+    ObjRef insertObject(GraphID_t id, Args... args) 
     {
       auto i=objects.find(id);
       if (i==objects.end())
-        return AddNewObject(ObjectPtr<T>(id, std::make_shared<U>(std::forward<Args>(args)...)));
+        return insertObject(ObjectPtr<T>(id, std::make_shared<U>(std::forward<Args>(args)...)));
       return **i;
     }
   };		   
@@ -424,15 +427,16 @@ namespace graphcode
       for (auto& p: *this) 
 	{
 	  assert(p);
-	  b<<p->id<<*p;
+	  b<<p.id()<<static_cast<ObjectPtrBase>(p);
 	}
     b.gather(0);
     if (myid()==0)
       {
 	while (b.pos()<b.size())
 	  {
-	    GraphID_t id; b>>id;
-	    b>>objects[id];
+            GraphID_t id;
+            b>>id;
+            b>>objects[id];
 	  }
       }
 #endif
@@ -455,8 +459,8 @@ namespace graphcode
 	/* build a list of ID requests to be sent to processors */
 	for (auto& obj1:*this)
 	  for (auto& obj2: *obj1)
-            if (obj2->proc!=myid())
-              uniq_req[obj2->proc].insert(obj2->id);
+            if (obj2.proc()!=myid())
+              uniq_req[obj2.proc()].insert(obj2.id());
 
 	/* now send & receive requests */
 	tag++;
@@ -553,7 +557,7 @@ namespace graphcode
 	pin_migrate_list >> proc >> index;
         auto o=objects.find(index);
         if (o!=objects.end())
-          ObjRef(*o)->proc=proc;
+          o->proc=proc;
       }
     rebuildPtrLists();
 #endif /* MPI_SUPPORT */
@@ -578,7 +582,24 @@ namespace classdesc_access
   template <>
   struct access_unpack<graphcode::object>:
     public cd::NullDescriptor<cd::pack_t> {};
+  
+  template <>
+  struct access_pack<graphcode::ObjectPtrBase> {
+    template <class U>
+    void operator()(cd::pack_t& p, const cd::string& d, U& a)
+    {
+      p<<a.proc<<static_cast<const std::shared_ptr<graphcode::object>&>(a);
+    }
+  };
 
+  template <>
+  struct access_unpack<graphcode::ObjectPtrBase>
+  {
+    void operator()(cd::unpack_t& p, const cd::string& d, graphcode::ObjectPtrBase& a)
+    {
+      p>>a.proc>>static_cast<std::shared_ptr<graphcode::object>&>(a);
+    }
+  };
 }
   
 #endif  /* GRAPHCODE_H */

@@ -57,14 +57,14 @@ namespace graphcode
 
     /* label each pin sequentially within processor */
     for (auto& pi: global) 
-      pmap[pi->id]=counts[pi->proc+1]++;
+      pmap[pi.id()]=counts[pi.proc()+1]++;
 
     /* counts becomes running sum of counts of local pins */
     for (i=1; i<nprocs(); i++) counts[i+1]+=counts[i];
 
     /* add offset for each processor to map */
     for (auto& pi: global)  
-      pmap[pi->id]+=counts[pi->proc];
+      pmap[pi.id()]+=counts[pi.proc()];
 
     /* construct a set of edges connected to each local vertex */
     vector<vector<unsigned> > nbrs(nvertices);
@@ -73,9 +73,9 @@ namespace graphcode
       for (auto& p: local)
 	for (auto& n: *p)
 	  {
-	    if (n->id==p->id) continue; /* ignore self-links */
-	    nbrs[pmap[p->id]].push_back(pmap[n->id]);
-	    edgedist[n->proc] << std::make_pair(pmap[n->id],pmap[p->id]);
+	    if (n.id()==p.id()) continue; /* ignore self-links */
+	    nbrs[pmap[p.id()]].push_back(pmap[n.id()]);
+	    edgedist[n.proc()] << std::make_pair(pmap[n.id()],pmap[p.id()]);
 	  }
 
       /* Ensure reverse edge is in graph (Metis requires graphs to be undirected */
@@ -115,7 +115,7 @@ namespace graphcode
     /* reverse pmap */
     vector<GraphID_t> rpmap(nvertices); 			
     for (auto& pi: global) 
-      rpmap[pmap[pi->id]]=pi->id;
+      rpmap[pmap[pi.id()]]=pi.id();
     i=1, j=0;
     for (auto p=local.begin(); p!=local.end(); p++, i++) 
       for (auto otherNode=(*p)->begin(); j<unsigned(offsets[i]); ++j, ++otherNode)
@@ -145,7 +145,7 @@ namespace graphcode
 
     /* prepare pins to be sent to remote processors */
     for (auto& p:local)
-      p->proc=partitioning[pmap[p->id]-counts[myid()]];
+      p.proc(partitioning[pmap[p.id()]-counts[myid()]]);
 
 #endif
   }
