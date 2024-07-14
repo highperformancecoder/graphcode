@@ -31,11 +31,11 @@ using namespace std;
 #include <classdesc_epilogue.h>
 
 /* coordinate to ID function */
-struct makeID_t
+struct MakeId
 {
   int size;
-  makeID_t(int s): size(s) {}
-  GraphID_t operator()(int x, int y)
+  MakeId(int s): size(s) {}
+  GraphId operator()(int x, int y)
   { return Wrap(x,size) + size*Wrap(y,size);}
 };
 
@@ -47,7 +47,7 @@ void print(ObjRef& x)
   std::cout << std::endl;
 };
 
-class von: public Graph<cell>
+class Von: public Graph<Cell>
 {
 public:
   void setup(int size);
@@ -55,38 +55,38 @@ public:
   void print();
 };
 
-void von::setup(int size)
+void Von::setup(int size)
 {
   unsigned xprocs=(unsigned)sqrt(double(nprocs()));
   unsigned yprocs=nprocs()/xprocs;
   int i, j;
-  makeID_t makeID(size);
+  MakeId makeId(size);
   for(j=0; j<size; j++)
     for(i=0; i<size; i++)
       {
-	ObjRef o=insertObject<>(makeID(i,j));
+	ObjRef o=insertObject<>(makeId(i,j));
         o.proc((i*xprocs) / size + (j*yprocs)/size*xprocs);
-        o->neighbours.push_back(makeID(i-1,j)); 
-        o->neighbours.push_back(makeID(i+1,j)); 
-        o->neighbours.push_back(makeID(i,j-1)); 
-        o->neighbours.push_back(makeID(i,j+1)); 
+        o->neighbours.push_back(makeId(i-1,j)); 
+        o->neighbours.push_back(makeId(i+1,j)); 
+        o->neighbours.push_back(makeId(i,j-1)); 
+        o->neighbours.push_back(makeId(i,j+1)); 
       }
   
   rebuildPtrLists();
 }
 
-void cell::update(const cell& from)
+void Cell::update(const Cell& from)
 {
-  double sum_nbr=0;
+  double sumNbr=0;
   for (auto& n: from)
     {
-      auto& nbr=*n->as<cell>();
-      sum_nbr += nbr.my_value;
+      auto& nbr=*n->as<Cell>();
+      sumNbr += nbr.myValue;
     }
-  my_value = from.my_value + 0.1*(sum_nbr - from.size()*from.my_value);
+  myValue = from.myValue + 0.1*(sumNbr - from.size()*from.myValue);
 }
 
-void von::update()
+void Von::update()
 {
   prepareNeighbours(true); /* make a copy of neighbouring objects
 				      onto the current thread */
@@ -94,26 +94,26 @@ void von::update()
   from.objects=objects.deepCopy();
   from.rebuildPtrLists();
   for(auto& i: *this)
-    i->as<cell>()->update( *from.objects[i.id()]);
+    i->as<Cell>()->update( *from.objects[i.id()]);
 }
 	
-double localError(Graph<cell>& pGraph, unsigned int size)
+double localError(Graph<Cell>& pGraph, unsigned int size)
 {
   double retval=0.0;
   for (auto& i: pGraph)
-    retval += fabs(i->as<cell>()->my_value-0.5);
+    retval += fabs(i->as<Cell>()->myValue-0.5);
   return retval;
 }
 
-double error(Graph<cell>& pGraph, unsigned int size)
+double error(Graph<Cell>& pGraph, unsigned int size)
 {
   double retval=0.0;
   for (auto& i: pGraph.objects)
-    retval += fabs(i->my_value-0.5);
+    retval += fabs(i->myValue-0.5);
   return retval;
 }
 
-inline void swap(von*& x, von*& y)  { von *t=x;  x=y;  y=t;}
+inline void swap(Von*& x, Von*& y)  { Von *t=x;  x=y;  y=t;}
 
 int main(int argc, char** argv) 
 {
@@ -127,17 +127,17 @@ int main(int argc, char** argv)
       printf("usage: %s gridsize niter\n",argv[0]);
       return 1;
     }
-  const int testsize=atoi(argv[1]);
-  const int niter=atoi(argv[2]);
+  const int testSize=atoi(argv[1]);
+  const int nIter=atoi(argv[2]);
   
   /* initialise random number generator */
   initr(0xdeadbeef);
   for(int junk=0; junk<(1<<16); junk++)
     ibase();
 
-  von g;
+  Von g;
 
-  g.setup(testsize);
+  g.setup(testSize);
 
   // In this case, objects are created insitu, so neither of the
   // following methods are needed. They are included just to exercise
@@ -146,13 +146,13 @@ int main(int argc, char** argv)
   g.distributeObjects();
 
   g.gather();
-  double starterror=error(g, testsize);
+  double startError=error(g, testSize);
 
-  for(int t=0; t<niter; t++)
+  for(int t=0; t<nIter; t++)
     {
 #ifndef SILENT
       printf("On node %d: time is: %d, error is: %5.10f, updating...\n", 
-	     myid(), t, localError(g, testsize));
+	     myid(), t, localError(g, testSize));
 #endif
       g.update();
     }
@@ -160,8 +160,8 @@ int main(int argc, char** argv)
   g.gather();
   if (myid()==0)
     {
-      cout << "Total error="<<error(g, testsize)<<endl;
-      if (error(g, testsize)/ starterror >0.2) return 1;
+      cout << "Total error="<<error(g, testSize)<<endl;
+      if (error(g, testSize)/ startError >0.2) return 1;
     }
   return 0;
 }

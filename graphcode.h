@@ -1,5 +1,5 @@
-/*
-  @copyright Russell Standish 2000-2013
+/* 
+ @copyright Russell Standish 2000-2013
   @author Russell Standish
   This file is part of Graphcode
 
@@ -18,16 +18,6 @@
 #include <classdescMP.h>
 
 #ifdef PARMETIS
-/* Metis stuff */
-//extern "C" void METIS_PartGraphRecursive
-//(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
-// unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
-// unsigned* edgecut, unsigned* part);
-//extern "C" void METIS_PartGraphKway
-//(unsigned* n,unsigned* xadj,unsigned* adjncy,unsigned* vwgt,unsigned* adjwgt,
-// unsigned* wgtflag,unsigned* numflag,unsigned* nparts,unsigned* options, 
-// unsigned* edgecut, unsigned* part);
-
 #include <parmetis.h>
 #else
 typedef int idx_t;  /* just for defining dummy weight functions */
@@ -55,10 +45,10 @@ namespace classdesc
 namespace graphcode
 {
   /// Type used for Graph object identifier
-  typedef unsigned long GraphID_t;
-  /** a pin with ID==bad_ID cannot be inserted into a map or wire 
+  typedef unsigned long GraphId;
+  /** a pin with ID==badId cannot be inserted into a map or wire 
    - can be used for handling boundary conditions during graph construction */
-  const GraphID_t badId=~0UL;
+  const GraphId badId=~0UL;
 
   using std::vector;
   using std::map;
@@ -120,21 +110,21 @@ namespace graphcode
 
   class ObjectPtrBase: public std::shared_ptr<graphcode::object>
   {
-    GraphID_t m_id;
+    GraphId m_id;
   public:
-    GraphID_t id() const {return m_id;}
+    GraphId id() const {return m_id;}
     int proc=0;
-    ObjectPtrBase(GraphID_t id=badId, const std::shared_ptr<object>& x=nullptr):
+    ObjectPtrBase(GraphId id=badId, const std::shared_ptr<object>& x=nullptr):
       m_id(id), std::shared_ptr<object>(x) {}
-    ObjectPtrBase(GraphID_t id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+    ObjectPtrBase(GraphId id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
   };
 
   template <class T> class ObjectPtr: public ObjectPtrBase
   {
   public:
-    ObjectPtr(GraphID_t id=badId, const std::shared_ptr<T>& x=nullptr):
+    ObjectPtr(GraphId id=badId, const std::shared_ptr<T>& x=nullptr):
       ObjectPtrBase(id, x) {}
-    ObjectPtr(GraphID_t id, std::shared_ptr<T>&& x): ObjectPtrBase(id, x) {}
+    ObjectPtr(GraphId id, std::shared_ptr<T>&& x): ObjectPtrBase(id, x) {}
     T& operator*() const {return static_cast<T&>(ObjectPtrBase::operator*());}
     T* operator->() const {return static_cast<T*>(ObjectPtrBase::operator->());}
   };
@@ -148,7 +138,7 @@ namespace graphcode
   public:
     ObjRef()=default;
     ObjRef(const ObjectPtrBase& x): payload(const_cast<ObjectPtrBase*>(&x)) {}
-    GraphID_t id() const {return payload? payload->id(): badId;}
+    GraphId id() const {return payload? payload->id(): badId;}
     int proc() const {return payload? payload->proc: 0;}
     int proc(int p) {if (payload) payload->proc=p; return proc();}
     object& operator*() const {return **payload;}
@@ -180,7 +170,7 @@ namespace graphcode
   class object: public Exclude<PtrList>, public classdesc::object
   {
   public:
-    std::vector<GraphID_t> neighbours;
+    std::vector<GraphId> neighbours;
     /// construct the internal pointer-based neighbour list, given the list of neighbours in \a neighbours
     template <class OMap> void updatePtrList(const OMap& o) {
       clear();
@@ -213,7 +203,7 @@ namespace graphcode
     virtual void RESTProcess(classdesc::RESTProcess_t&,const classdesc::string&) {}
     virtual idx_t weight() const {return 1;} ///< node's weight (for partitioning)
     /// weight for edge connecting \c *this to \a x
-    virtual idx_t edgeweight(const ObjRef& x) const {return 1;} 
+    virtual idx_t edgeWeight(const ObjRef& x) const {return 1;} 
   };
 
   /// Curiously recursive template pattern to define classdesc'd methods
@@ -242,7 +232,7 @@ namespace graphcode
 
   template <class T> struct Hash
   {
-    size_t operator()(const ObjectPtr<T>& x) const {return std::hash<GraphID_t>()(x.id());}
+    size_t operator()(const ObjectPtr<T>& x) const {return std::hash<GraphId>()(x.id());}
   };
   
   template <class T> struct KeyEqual
@@ -257,23 +247,23 @@ namespace graphcode
     using Super::erase;
     using Super::count;
     using Super::insert;
-    typename Super::iterator find(GraphID_t id) {
+    typename Super::iterator find(GraphId id) {
       ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
-    typename Super::const_iterator find(GraphID_t id) const {
+    typename Super::const_iterator find(GraphId id) const {
       ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
-    typename Super::iterator erase(GraphID_t id) {
+    typename Super::iterator erase(GraphId id) {
       ObjectPtr<T> tmp(id); return Super::erase(tmp);
     }
-    size_t count(GraphID_t id) const {
+    size_t count(GraphId id) const {
       ObjectPtr<T> tmp(id); return Super::count(tmp);
     }
-    ObjectPtr<T>& operator[](GraphID_t id) {
+    ObjectPtr<T>& operator[](GraphId id) {
       // const_cast OK because id() is immutable
       return const_cast<ObjectPtr<T>&>(*Super::emplace(id).first);
     }
-    const ObjectPtr<T>& operator[](GraphID_t id) const {
+    const ObjectPtr<T>& operator[](GraphId id) const {
         auto& i=find(id);
         if (i==this->end()) return badId;
         return *i;
@@ -293,8 +283,8 @@ namespace graphcode
   class Graph: public Exclude<PtrList>
   {
   public: //(should be) private:
-    vector<vector<GraphID_t> > rec_req; 
-    vector<vector<GraphID_t> > requests; 
+    vector<vector<GraphId> > rec_req; 
+    vector<vector<GraphId> > requests; 
     unsigned tag=0;  /* tag used to ensure message groups do not overlap */
     bool type_registered(const graphcode::object& x) {return x.type()>=0;}
 
@@ -320,7 +310,7 @@ namespace graphcode
     */
     void purge()
     {
-      std::unordered_set<GraphID_t> references;
+      std::unordered_set<GraphId> references;
       for (auto& i: objects)
         if (i->proc()==myid())
           {
@@ -398,7 +388,7 @@ namespace graphcode
        - does not create new object if one is already present
     */
     template <class U=T, class... Args>
-    ObjRef insertObject(GraphID_t id, Args... args) 
+    ObjRef insertObject(GraphId id, Args... args) 
     {
       auto i=objects.find(id);
       if (i==objects.end())
@@ -434,7 +424,7 @@ namespace graphcode
       {
 	while (b.pos()<b.size())
 	  {
-            GraphID_t id;
+            GraphId id;
             b>>id;
             b>>objects[id];
 	  }
@@ -455,7 +445,7 @@ namespace graphcode
 	rec_req.resize(nprocs());
 	requests.clear();
 	requests.resize(nprocs());
-        vector<set<GraphID_t> > uniq_req(nprocs());
+        vector<set<GraphId> > uniq_req(nprocs());
 	/* build a list of ID requests to be sent to processors */
 	for (auto& obj1:*this)
 	  for (auto& obj2: *obj1)
@@ -549,7 +539,7 @@ namespace graphcode
     for (int i=0; i<nprocs()-1; i++)
       {
 	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
-	GraphID_t index;
+	GraphId index;
 	while (b.pos()<b.size()) 
 	  {
 	    b >> index;
@@ -563,7 +553,7 @@ namespace graphcode
     pin_migrate_list.bcast(0);
     while (pin_migrate_list.pos() < pin_migrate_list.size())
       {
-	GraphID_t index; unsigned proc;
+	GraphId index; unsigned proc;
 	pin_migrate_list >> proc >> index;
         assert(proc<nprocs());
         auto o=objects.find(index);
@@ -627,7 +617,7 @@ namespace classdesc_access
     {
       while (p)
         {
-          graphcode::GraphID_t id;
+          graphcode::GraphId id;
           p>>id;
           p>>a[id];
         }

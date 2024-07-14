@@ -20,17 +20,17 @@ namespace graphcode
   using std::map;
 
   template <class T>
-  struct array /* simple array for ParMETIS use */
+  struct Array /* simple array for ParMETIS use */
   {
     T *v;
-    array(unsigned n) {v=new T[n];}
-    ~array() {delete [] v;}
+    Array(unsigned n) {v=new T[n];}
+    ~Array() {delete [] v;}
     operator T*() {return v;}
     T& operator[](unsigned i) {return v[i];}
   };
 
 #ifdef MPI_SUPPORT
-  void check_add_reverse_edge(vector<vector<unsigned> >& nbrs, MPIbuf& b)
+  void checkAddReverseEdge(vector<vector<unsigned> >& nbrs, MPIbuf& b)
     {
       pair<unsigned,unsigned> edge;
       while (b.pos()<b.size())
@@ -50,21 +50,21 @@ namespace graphcode
     unsigned i, j, nedges, nvertices=global.size();
 
     /* ParMETIS needs vertices to be labelled contiguously on each processor */
-    map<GraphID_t,unsigned int> pmap; 			
+    map<GraphId,unsigned int> pMap; 			
     vector<idx_t> counts(nprocs()+1);
     for (i=0; i<=nprocs(); i++) 
       counts[i]=0;
 
     /* label each pin sequentially within processor */
     for (auto& pi: global) 
-      pmap[pi.id()]=counts[pi.proc()+1]++;
+      pMap[pi.id()]=counts[pi.proc()+1]++;
 
     /* counts becomes running sum of counts of local pins */
     for (i=1; i<nprocs(); i++) counts[i+1]+=counts[i];
 
     /* add offset for each processor to map */
     for (auto& pi: global)  
-      pmap[pi.id()]+=counts[pi.proc()];
+      pMap[pi.id()]+=counts[pi.proc()];
 
     /* construct a set of edges connected to each local vertex */
     vector<vector<unsigned> > nbrs(nvertices);
@@ -74,18 +74,18 @@ namespace graphcode
 	for (auto& n: *p)
 	  {
 	    if (n.id()==p.id()) continue; /* ignore self-links */
-	    nbrs[pmap[p.id()]].push_back(pmap[n.id()]);
-	    edgedist[n.proc()] << std::make_pair(pmap[n.id()],pmap[p.id()]);
+	    nbrs[pMap[p.id()]].push_back(pMap[n.id()]);
+	    edgedist[n.proc()] << std::make_pair(pMap[n.id()],pMap[p.id()]);
 	  }
 
       /* Ensure reverse edge is in graph (Metis requires graphs to be undirected */
       tag++;
       for (i=0; i<nprocs(); i++) if (i!=myid()) edgedist[i].isend(i,tag);
       /* process local list first */
-      check_add_reverse_edge(nbrs,edgedist[myid()]);
+      checkAddReverseEdge(nbrs,edgedist[myid()]);
       /* now get them from remote processors */
       for (i=0; i<nprocs()-1; i++)
-	check_add_reverse_edge(nbrs,MPIbuf().get(MPI_ANY_SOURCE,tag));
+	checkAddReverseEdge(nbrs,MPIbuf().get(MPI_ANY_SOURCE,tag));
     }
 
     /* compute number of edges connected to vertices local to this processor */
@@ -107,34 +107,34 @@ namespace graphcode
 	offsets[i-counts[myid()]+1]=nedges;
       }
 
-    int weightflag=3, numflag=0, nparts=nprocs(), edgecut, ncon=1;
-    vector<float> tpwgts(nparts);
-    vector<idx_t> vwgts(local.size()), ewgts(nedges);
+    int weightFlag=3, numFlag=0, nParts=nprocs(), edgeCut, nCon=1;
+    vector<float> tpWgts(nParts);
+    vector<idx_t> vWgts(local.size()), eWgts(nedges);
     i=0;
-    for (auto& p: local) vwgts[i++]=p->weight();
+    for (auto& p: local) vWgts[i++]=p->weight();
     /* reverse pmap */
-    vector<GraphID_t> rpmap(nvertices); 			
+    vector<GraphId> rpMap(nvertices); 			
     for (auto& pi: global) 
-      rpmap[pmap[pi.id()]]=pi.id();
+      rpMap[pMap[pi.id()]]=pi.id();
     i=1, j=0;
     for (auto p=local.begin(); p!=local.end(); p++, i++) 
       for (auto otherNode=(*p)->begin(); j<unsigned(offsets[i]); ++j, ++otherNode)
         {
-          ewgts[j]=(*p)->edgeweight(**otherNode);
+          eWgts[j]=(*p)->edgeWeight(**otherNode);
         }
-    for (i=0; i<unsigned(nparts); i++) tpwgts[i]=1.0/nparts;
+    for (i=0; i<unsigned(nParts); i++) tpWgts[i]=1.0/nParts;
     float ubvec[]={1.05};
     int options[]={0,0,0,0,0}; /* for production */
     //int options[]={1,0xFF,15,0,0};  /* for debugging */
     MPI_Comm comm=MPI_COMM_WORLD;
-    ParMETIS_V3_PartKway(counts.data(),offsets.data(),edges.data(),vwgts.data(),ewgts.data(),
-			&weightflag,&numflag,&ncon,&nparts,tpwgts.data(),ubvec,options,
-			&edgecut,partitioning.data(),&comm);
+    ParMETIS_V3_PartKway(counts.data(),offsets.data(),edges.data(),vWgts.data(),eWgts.data(),
+			&weightFlag,&numFlag,&nCon,&nParts,tpWgts.data(),ubvec,options,
+			&edgeCut,partitioning.data(),&comm);
 
     /* prepare pins to be sent to remote processors */
     for (auto& p:local)
       {
-        p.proc(partitioning[pmap[p.id()]-counts[myid()]]);
+        p.proc(partitioning[pMap[p.id()]-counts[myid()]]);
         assert(p.proc()<nprocs());
       }
 #endif

@@ -7,9 +7,9 @@
 */
 
 /* this is the per-pin data */
-struct cell: graphcode::Object<cell>
+struct Cell: graphcode::Object<Cell>
 {
-  double my_value;
-  void update(const cell&);
-  cell(): my_value(drand()) {}
+  double myValue;
+  void update(const Cell&);
+  Cell(): myValue(drand()) {}
 };
