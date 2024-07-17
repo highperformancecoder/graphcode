@@ -72,9 +72,7 @@ void Von::setup(int size)
         o->neighbours.push_back(makeId(i,j+1)); 
       }
 
-  assert(objects.noNulls());
   rebuildPtrLists();
-  assert(objects.noNulls());
 }
 
 void Cell::update(const Cell& from)

@@ -14,7 +14,7 @@
 
 namespace graphcode
 {
-  void Graph::gather()
+  void GraphBase::gather()
   {
 #ifdef MPI_SUPPORT
     MPIbuf b; 
@@ -22,15 +22,16 @@ namespace graphcode
       for (auto& p: *this) 
 	{
 	  assert(p);
-	  b<<p.id()<<*p;
+	  b<<p.id()<<static_cast<ObjectPtrBase>(p);
 	}
     b.gather(0);
     if (myid()==0)
       {
 	while (b.pos()<b.size())
 	  {
-	    GraphID_t id; b>>id;
-	    b>>objects[id];
+            GraphId id;
+            b>>id;
+            b>>objectRef(id);
 	  }
       }
 #endif
