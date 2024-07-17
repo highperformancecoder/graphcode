@@ -117,6 +117,12 @@ namespace graphcode
     ObjectPtrBase(GraphId id=badId, const std::shared_ptr<object>& x=nullptr):
       m_id(id), std::shared_ptr<object>(x) {}
     ObjectPtrBase(GraphId id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+    ObjectPtrBase& operator=(const ObjectPtrBase& x) {
+      // specialisation to ensure m_id is not overwritten
+      std::shared_ptr<graphcode::object>::operator=(x);
+      proc=x.proc;
+      return *this;
+    }
   };
 
   template <class T> class ObjectPtr: public ObjectPtrBase
@@ -145,6 +151,7 @@ namespace graphcode
     object* operator->() const {return payload->get();}
     operator bool() const {return payload && *payload;}
     operator ObjectPtrBase() const {return *payload;}
+    void nullify() {payload->reset();}
   };
 
   /**
@@ -274,55 +281,54 @@ namespace graphcode
         r.insert(ObjectPtr<T>(x.id(), std::shared_ptr<T>(x->template cloneObject<T>())));
       return r;
     }
+    bool noNulls() const {
+      bool r=true;
+      for (auto& i: *this) r &= bool(i);
+      return r;
+    }
+    // true if all keys are distinct
+    bool sane() const {
+      set<GraphId> keys;
+      for (auto& i: *this)
+        if (!keys.insert(i.id()).second)
+          return false;
+      return true;
+    }
   };
 
-  /** Graph is a list of node refs stored on local processor, and has a
-     map of object references (called objects) referring to the nodes.   */
-
-  template <class T>
-  class Graph: public Exclude<PtrList>
+  class GraphBase: public PtrList
   {
-  public: //(should be) private:
+  protected:
     vector<vector<GraphId> > rec_req; 
     vector<vector<GraphId> > requests; 
     unsigned tag=0;  /* tag used to ensure message groups do not overlap */
-    bool type_registered(const graphcode::object& x) {return x.type()>=0;}
-
+    virtual bool sane() const=0;
   public:
-    OMap<T> objects;
+    static bool typeRegistered(const graphcode::object& x) {return x.type()>=0;}
+    PtrList objectRefs;
+    virtual ObjectPtrBase& objectRef(GraphId)=0;
 
     /**
        Rebuild the list of locally hosted objects
     */
-    void rebuildPtrLists()
-    {
-      clear();
-      for (auto& i: objects)
-        {
-          assert(i);
-          if (i.proc==myid()) emplace_back(i);
-          i->updatePtrList(objects);
-        }
-    }
-
+    virtual void rebuildPtrLists()=0;
     /**
        remove from local memory any objects not hosted locally
     */
     void purge()
     {
       std::unordered_set<GraphId> references;
-      for (auto& i: objects)
-        if (i->proc()==myid())
+      for (auto& i: objectRefs)
+        if (i.proc()==myid())
           {
-            references.insert(i.id);
+            references.insert(i.id());
             for (auto id: i->neighbours)
               references.insert(id);
           }
       // now remove all unreferenced items
-      for (auto i=objects.begin(); i!=objects.end();)
-        if (references.count(i->id)==0)
-          i=objects.erase(i);
-        else ++i;
+      for (auto& i: this->objectRefs)
+        if (references.count(i.id())==0)
+          i.nullify();
     }
     
     /** 
@@ -333,10 +339,10 @@ namespace graphcode
       if (proc==myid())
 	for (auto& i: *this)
 	  {
-	    std::cout << " i->ID="<<i->id<<":";
+	    std::cout << " i->ID="<<i.id()<<":";
             if (i)
               for (auto& j: *i)
-                std::cout << j->id <<",";
+                std::cout << j.id() <<",";
 	    std::cout << std::endl;
 	  }
     }
@@ -350,6 +356,34 @@ namespace graphcode
     */
     void prepareNeighbours(bool cache_requests=false);
     void partitionObjects(); ///< partition
+  };
+
+  /** Graph is a list of node refs stored on local processor, and has a
+     map of object references (called objects) referring to the nodes.   */
+
+  template <class T>
+  class Graph: public Exclude<GraphBase>
+  {
+    ObjectPtrBase& objectRef(GraphId id) override {return objects[id];}
+    bool sane() const override {return objects.sane();}
+  public:
+    OMap<T> objects;
+
+    void rebuildPtrLists() override
+    {
+      clear();
+      objectRefs.clear();
+      for (auto& i: objects)
+        {
+          objectRefs.emplace_back(i);
+          if (i.proc==myid()) {
+            assert(i);
+            emplace_back(i);
+          }
+          if (i) i->updatePtrList(objects);
+        }
+    }
+
     /**
        distribute objects from proc 0 according to partitioning set in the 
        \c objref's \c proc field
@@ -363,7 +397,7 @@ namespace graphcode
     {
       auto& i=*(objects.emplace(o).first);
       i->type(); /* ensure type is registered */
-      assert(type_registered(*i));
+      assert(typeRegistered(*i));
       return i;
     }
 
@@ -408,8 +442,7 @@ namespace graphcode
 #endif
   }
 
-  template <class T>
-  inline void Graph<T>::gather()
+  inline void GraphBase::gather()
   {
 #ifdef MPI_SUPPORT
     MPIbuf b; 
@@ -426,14 +459,13 @@ namespace graphcode
 	  {
             GraphId id;
             b>>id;
-            b>>objects[id];
+            b>>objectRef(id);
 	  }
       }
 #endif
   }
 
-  template <class T>
-  inline void Graph<T>::prepareNeighbours(bool cache_requests)
+  inline void GraphBase::prepareNeighbours(bool cache_requests)
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
@@ -477,29 +509,28 @@ namespace graphcode
 	if (proc==myid()) continue;
 	unsigned i;
 	for (i=0; i<rec_req[proc].size(); i++)
-	  sendbuf[proc] << objects[rec_req[proc][i]];
+	  sendbuf[proc] << objectRef(rec_req[proc][i]);
 	sendbuf[proc].isend(proc,tag);
       }
     for (unsigned p=0; p<nprocs()-1; p++)
       {
 	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
 	for (unsigned i=0; i<requests[b.proc].size(); i++) 
-	  b>>objects[requests[b.proc][i]];
+	  b>>objectRef(requests[b.proc][i]);
       }
-    rebuildPtrLists();
+      rebuildPtrLists();
 #endif /* MPI_SUPPORT */
   }
 
   void partitionObjectsImpl(const PtrList&, PtrList&, unsigned&);
   
-  template <class T>
-  inline void Graph<T>::partitionObjects()
+  inline void GraphBase::partitionObjects()
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
     rebuildPtrLists();
     prepareNeighbours(); /* used for computing edgeweights */
-    partitionObjectsImpl(PtrList(objects.begin(), objects.end()), *this, tag);
+    partitionObjectsImpl(objectRefs, *this, tag);
     rec_req.clear(); /* destroy record of previous communication patterns */
 
 #if 0
@@ -543,7 +574,7 @@ namespace graphcode
 	while (b.pos()<b.size()) 
 	  {
 	    b >> index;
-	    b >> objects[index];
+	    b >> objectRef(index);
 	  }
       }
 
@@ -556,10 +587,7 @@ namespace graphcode
 	GraphId index; unsigned proc;
 	pin_migrate_list >> proc >> index;
         assert(proc<nprocs());
-        auto o=objects.find(index);
-        if (o!=objects.end())
-          // const cast OK here, as only the id field is sacrosanct
-          const_cast<ObjectPtr<T>&>(*o).proc=proc;
+        objectRef(index).proc=proc;
       }
     rebuildPtrLists();
 #endif /* MPI_SUPPORT */
