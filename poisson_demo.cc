@@ -22,7 +22,6 @@ extern double drand(void);
 #include <iostream>
 #define MAP vmap
 #include "graphcode.h"
-#include "graphcode.cd"
 using namespace graphcode;
 using namespace std;
 

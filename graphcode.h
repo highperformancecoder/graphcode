@@ -114,9 +114,9 @@ namespace graphcode
   public:
     GraphId id() const {return m_id;}
     int proc=0;
-    ObjectPtrBase(GraphId id=badId, const std::shared_ptr<object>& x=nullptr):
+    ObjectPtrBase(GraphId id=badId, const std::shared_ptr<graphcode::object>& x=nullptr):
       m_id(id), std::shared_ptr<object>(x) {}
-    ObjectPtrBase(GraphId id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): m_id(id), std::shared_ptr<object>(x) {}
     ObjectPtrBase& operator=(const ObjectPtrBase& x) {
       // specialisation to ensure m_id is not overwritten
       std::shared_ptr<graphcode::object>::operator=(x);
@@ -227,15 +227,8 @@ namespace graphcode
   
 
   template <class T>
-  inline bool operator<(const ObjectPtr<T>& x, const ObjectPtr<T>& y) {
-    if (x)
-      {
-        if (y)
-          return x->id<y->id;
-        return false;
-      }
-    return y;
-  }
+  inline bool operator<(const ObjectPtr<T>& x, const ObjectPtr<T>& y)
+  {return x.id()<y.id();}
 
   template <class T> struct Hash
   {
@@ -247,28 +240,30 @@ namespace graphcode
     bool operator()(const ObjectPtr<T>& x, const ObjectPtr<T>& y) const {
       return x.id()==y.id();}
   };
-  
-  template <class T> struct OMap: public std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>
+
+  template <class T> using OMapImpl=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
+  template <class T> struct OMap: public OMapImpl<T>
   {
-    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
-    using Super::erase;
-    using Super::count;
-    using Super::insert;
-    typename Super::iterator find(GraphId id) {
-      ObjectPtr<T> tmp(id); return Super::find(tmp);
+    using OMapImpl<T>::erase;
+    using OMapImpl<T>::count;
+    using OMapImpl<T>::insert;
+    using typename OMapImpl<T>::iterator;
+    using typename OMapImpl<T>::const_iterator;
+    OMap::iterator find(GraphId id) {
+      ObjectPtr<T> tmp(id); return OMapImpl<T>::find(tmp);
     }
-    typename Super::const_iterator find(GraphId id) const {
-      ObjectPtr<T> tmp(id); return Super::find(tmp);
+    OMap::const_iterator find(GraphId id) const {
+      ObjectPtr<T> tmp(id); return OMapImpl<T>::find(tmp);
     }
-    typename Super::iterator erase(GraphId id) {
-      ObjectPtr<T> tmp(id); return Super::erase(tmp);
+    size_t erase(GraphId id) {
+      ObjectPtr<T> tmp(id); return OMapImpl<T>::erase(tmp);
     }
     size_t count(GraphId id) const {
-      ObjectPtr<T> tmp(id); return Super::count(tmp);
+      ObjectPtr<T> tmp(id); return OMapImpl<T>::count(tmp);
     }
     ObjectPtr<T>& operator[](GraphId id) {
       // const_cast OK because id() is immutable
-      return const_cast<ObjectPtr<T>&>(*Super::emplace(id).first);
+      return const_cast<ObjectPtr<T>&>(*OMapImpl<T>::emplace(id).first);
     }
     const ObjectPtr<T>& operator[](GraphId id) const {
         auto& i=find(id);
@@ -416,10 +411,10 @@ namespace graphcode
     
     ObjRef overwriteObject(const ObjectPtr<T>& o)
     {
-      auto i=objects.find(o->id);
+      auto i=objects.find(o.id());
       if (i==objects.end())
         return insertObject(o);
-      *i=o;
+      const_cast<ObjectPtr<T>&>(*i)=o;
       return *i;
     }
   
@@ -504,4 +499,5 @@ namespace classdesc_access
   };
 }
   
+#include "graphcode.cd"
 #endif  /* GRAPHCODE_H */
