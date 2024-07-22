@@ -273,7 +273,8 @@ namespace graphcode
     OMap deepCopy() {
       OMap r;
       for (auto& x: *this)
-        r.insert(ObjectPtr<T>(x.id(), std::shared_ptr<T>(x->template cloneObject<T>())));
+        r.insert(ObjectPtr<T>
+                 (x.id(), std::shared_ptr<T>(x? x->template cloneObject<T>(): nullptr)));
       return r;
     }
     bool noNulls() const {
@@ -399,8 +400,11 @@ namespace graphcode
     ObjRef insertObject(const ObjectPtr<T>& o)
     {
       auto& i=*(objects.emplace(o).first);
-      i->type(); /* ensure type is registered */
-      assert(typeRegistered(*i));
+      if (i)
+        {
+          i->type(); /* ensure type is registered */
+          assert(typeRegistered(*i));
+        }
       return i;
     }
 
