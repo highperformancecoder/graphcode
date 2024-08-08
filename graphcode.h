@@ -503,5 +503,4 @@ namespace classdesc_access
   };
 }
   
-#include "graphcode.cd"
 #endif  /* GRAPHCODE_H */
