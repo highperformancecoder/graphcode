@@ -4,8 +4,7 @@ OPT=
 PREFIX=$(HOME)/usr
 INCLUDES=-I. -I../classdesc -I$(HOME)/usr/include -I/usr/local/include
 VPATH+=../classdesc $(HOME)/usr/include /usr/local/include
-#OBJS=gather.o prepare_neighbours.o partition.o
-OBJS=partition.o
+OBJS=gather.o prepare_neighbours.o partition.o
 
 .SUFFIXES: .cc .o .d .cd .h 
 

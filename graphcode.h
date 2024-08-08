@@ -227,15 +227,8 @@ namespace graphcode
   
 
   template <class T>
-  inline bool operator<(const ObjectPtr<T>& x, const ObjectPtr<T>& y) {
-    if (x)
-      {
-        if (y)
-          return x->id<y->id;
-        return false;
-      }
-    return y;
-  }
+  inline bool operator<(const ObjectPtr<T>& x, const ObjectPtr<T>& y)
+  {return x.id()<y.id();}
 
   template <class T> struct Hash
   {
@@ -247,8 +240,9 @@ namespace graphcode
     bool operator()(const ObjectPtr<T>& x, const ObjectPtr<T>& y) const {
       return x.id()==y.id();}
   };
-  
-  template <class T> struct OMap: public std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>
+
+  template <class T> using OMapImpl=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
+  template <class T> struct OMap: public OMapImpl<T>
   {
     using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
     using Super::erase;
@@ -264,11 +258,11 @@ namespace graphcode
       ObjectPtr<T> tmp(id); return Super::erase(tmp);
     }
     size_t count(GraphId id) const {
-      ObjectPtr<T> tmp(id); return Super::count(tmp);
+      ObjectPtr<T> tmp(id); return OMapImpl<T>::count(tmp);
     }
     ObjectPtr<T>& operator[](GraphId id) {
       // const_cast OK because id() is immutable
-      return const_cast<ObjectPtr<T>&>(*Super::emplace(id).first);
+      return const_cast<ObjectPtr<T>&>(*OMapImpl<T>::emplace(id).first);
     }
     const ObjectPtr<T>& operator[](GraphId id) const {
         auto& i=find(id);
@@ -278,7 +272,8 @@ namespace graphcode
     OMap deepCopy() {
       OMap r;
       for (auto& x: *this)
-        r.insert(ObjectPtr<T>(x.id(), std::shared_ptr<T>(x->template cloneObject<T>())));
+        r.insert(ObjectPtr<T>
+                 (x.id(), std::shared_ptr<T>(x? x->template cloneObject<T>(): nullptr)));
       return r;
     }
     bool noNulls() const {
@@ -302,6 +297,7 @@ namespace graphcode
     vector<vector<GraphId> > rec_req; 
     vector<vector<GraphId> > requests; 
     unsigned tag=0;  /* tag used to ensure message groups do not overlap */
+    /// checks that objects all have unique keys (ids).
     virtual bool sane() const=0;
   public:
     static bool typeRegistered(const graphcode::object& x) {return x.type()>=0;}
@@ -388,7 +384,14 @@ namespace graphcode
        distribute objects from proc 0 according to partitioning set in the 
        \c objref's \c proc field
     */
-    inline void distributeObjects(); 
+    void distributeObjects()
+    {
+#ifdef MPI_SUPPORT
+      rec_req.clear();
+      MPIbuf() << objects << bcast(0) >> objects;
+      rebuildPtrLists();
+#endif
+    }
 
     /** 
         add the specified object into the Graph, if not already present
@@ -396,8 +399,11 @@ namespace graphcode
     ObjRef insertObject(const ObjectPtr<T>& o)
     {
       auto& i=*(objects.emplace(o).first);
-      i->type(); /* ensure type is registered */
-      assert(typeRegistered(*i));
+      if (i)
+        {
+          i->type(); /* ensure type is registered */
+          assert(typeRegistered(*i));
+        }
       return i;
     }
 
@@ -431,168 +437,6 @@ namespace graphcode
       return **i;
     }
   };		   
-  
-
-  template <class T>
-  inline void Graph<T>::distributeObjects()
-  {
-#ifdef MPI_SUPPORT
-    rec_req.clear();
-    MPIbuf() << objects << bcast(0) >> objects;
-    rebuildPtrLists();
-#endif
-  }
-
-  inline void GraphBase::gather()
-  {
-#ifdef MPI_SUPPORT
-    MPIbuf b; 
-    if (myid()>0) 
-      for (auto& p: *this) 
-	{
-	  assert(p);
-	  b<<p.id()<<static_cast<ObjectPtrBase>(p);
-	}
-    b.gather(0);
-    if (myid()==0)
-      {
-	while (b.pos()<b.size())
-	  {
-            GraphId id;
-            b>>id;
-            b>>objectRef(id);
-	  }
-      }
-#endif
-  }
-
-  inline void GraphBase::prepareNeighbours(bool cache_requests)
-  {
-#ifdef MPI_SUPPORT
-    if (nprocs()==1) return;
-    vector<vector<ObjRef> > return_data(nprocs());
-    
-    if (!cache_requests || rec_req.size()!=nprocs())
-      {
-	rec_req.clear();
-	rec_req.resize(nprocs());
-	requests.clear();
-	requests.resize(nprocs());
-        vector<set<GraphId> > uniq_req(nprocs());
-	/* build a list of ID requests to be sent to processors */
-	for (auto& obj1:*this)
-	  for (auto& obj2: *obj1)
-            if (obj2.proc()!=myid())
-              uniq_req[obj2.proc()].insert(obj2.id());
-
-	/* now send & receive requests */
-	tag++;
-	MPIbuf_array sendbuf(nprocs());
-	for (unsigned proc=0; proc<nprocs(); proc++)
-	  {
-	    if (proc==myid()) continue;
-	    sendbuf[proc] << uniq_req[proc] >> requests[proc];
-            sendbuf[proc].isend(proc,tag);
-	  }
-	for (unsigned i=0; i<nprocs()-1; i++)
-	  {
-	    MPIbuf b; 
-	    b.get(MPI_ANY_SOURCE,tag);
-	    b >> rec_req[b.proc];
-	  }
-      }
-
-    /* now service requests */
-    tag++;
-    MPIbuf_array sendbuf(nprocs());
-    for (unsigned proc=0; proc<nprocs(); proc++)
-      {
-	if (proc==myid()) continue;
-	unsigned i;
-	for (i=0; i<rec_req[proc].size(); i++)
-	  sendbuf[proc] << objectRef(rec_req[proc][i]);
-	sendbuf[proc].isend(proc,tag);
-      }
-    for (unsigned p=0; p<nprocs()-1; p++)
-      {
-	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
-	for (unsigned i=0; i<requests[b.proc].size(); i++) 
-	  b>>objectRef(requests[b.proc][i]);
-      }
-      rebuildPtrLists();
-#endif /* MPI_SUPPORT */
-  }
-
-  void partitionObjectsImpl(const PtrList&, PtrList&, unsigned&);
-  
-  inline void GraphBase::partitionObjects()
-  {
-#ifdef MPI_SUPPORT
-    if (nprocs()==1) return;
-    rebuildPtrLists();
-    prepareNeighbours(); /* used for computing edgeweights */
-    partitionObjectsImpl(objectRefs, *this, tag);
-    rec_req.clear(); /* destroy record of previous communication patterns */
-
-#if 0
-    /* this simple minded code updates processor locations, pulls all
-       data to the master, then redistributes - replaces the more
-       complex code after the #if 0, which doesn't seem to work ... */      
-    gather();
-    distributeObjects();
-    return;
-#endif
-
-    /* prepare pins to be sent to remote processors */
-    MPIbuf_array sendbuf(nprocs());
-    MPIbuf pin_migrate_list;
-    for (auto& p:*this)
-      {
-	if (p.proc()!=myid()) 
-	  {
-	    sendbuf[p.proc()]<<p.id()<<static_cast<ObjectPtrBase>(p);
-	    pin_migrate_list << p.proc() << p.id();
-	  }
-      }
-
-    /* clear list of local pins, then add back those remining locally */
-    //    for (clear(), i=0; i<stayput.size(); i++) push_back(stayput[i]);
-
-    /* send pins to remote processors */
-    tag++;
-
-    for (int i=0; i<nprocs(); i++)
-      {
-	if (i==myid()) continue;
-	sendbuf[i].isend(i,tag);
-      }
-
-    /* receive pins from remote processors */
-    for (int i=0; i<nprocs()-1; i++)
-      {
-	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
-	GraphId index;
-	while (b.pos()<b.size()) 
-	  {
-	    b >> index;
-	    b >> objectRef(index);
-	  }
-      }
-
- 
-   /* update proc records on all prcoessors */
-    pin_migrate_list.gather(0);
-    pin_migrate_list.bcast(0);
-    while (pin_migrate_list.pos() < pin_migrate_list.size())
-      {
-	GraphId index; unsigned proc;
-	pin_migrate_list >> proc >> index;
-        assert(proc<nprocs());
-        objectRef(index).proc=proc;
-      }
-    rebuildPtrLists();
-#endif /* MPI_SUPPORT */
-};
 }
   
 #ifdef _CLASSDESC
@@ -659,4 +503,5 @@ namespace classdesc_access
   };
 }
   
+#include "graphcode.cd"
 #endif  /* GRAPHCODE_H */

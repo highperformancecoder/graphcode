@@ -14,7 +14,7 @@
 
 namespace graphcode 
 {
-  void Graph::prepareNeighbours(bool cache_requests)
+  void GraphBase::prepareNeighbours(bool cache_requests)
   {
 #ifdef MPI_SUPPORT
     if (nprocs()==1) return;
@@ -26,7 +26,7 @@ namespace graphcode
 	rec_req.resize(nprocs());
 	requests.clear();
 	requests.resize(nprocs());
-        vector<set<GraphID_t> > uniq_req(nprocs());
+        vector<set<GraphId> > uniq_req(nprocs());
 	/* build a list of ID requests to be sent to processors */
 	for (auto& obj1:*this)
 	  for (auto& obj2: *obj1)
@@ -58,16 +58,17 @@ namespace graphcode
 	if (proc==myid()) continue;
 	unsigned i;
 	for (i=0; i<rec_req[proc].size(); i++)
-	  sendbuf[proc] << objects[rec_req[proc][i]];
+	  sendbuf[proc] << objectRef(rec_req[proc][i]);
 	sendbuf[proc].isend(proc,tag);
       }
     for (unsigned p=0; p<nprocs()-1; p++)
       {
 	MPIbuf b; b.get(MPI_ANY_SOURCE,tag);
 	for (unsigned i=0; i<requests[b.proc].size(); i++) 
-	  b>>objects[requests[b.proc][i]];
+	  b>>objectRef(requests[b.proc][i]);
       }
-    rebuildPtrLists();
+      rebuildPtrLists();
 #endif /* MPI_SUPPORT */
   }
+
 }

@@ -22,7 +22,6 @@ extern double drand(void);
 #include <iostream>
 #define MAP vmap
 #include "graphcode.h"
-#include "graphcode.cd"
 using namespace graphcode;
 using namespace std;
 
@@ -72,9 +71,7 @@ void Von::setup(int size)
         o->neighbours.push_back(makeId(i,j+1)); 
       }
 
-  assert(objects.noNulls());
   rebuildPtrLists();
-  assert(objects.noNulls());
 }
 
 void Cell::update(const Cell& from)
