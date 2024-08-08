@@ -114,9 +114,9 @@ namespace graphcode
   public:
     GraphId id() const {return m_id;}
     int proc=0;
-    ObjectPtrBase(GraphId id=badId, const std::shared_ptr<object>& x=nullptr):
+    ObjectPtrBase(GraphId id=badId, const std::shared_ptr<graphcode::object>& x=nullptr):
       m_id(id), std::shared_ptr<object>(x) {}
-    ObjectPtrBase(GraphId id, std::shared_ptr<object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): m_id(id), std::shared_ptr<object>(x) {}
     ObjectPtrBase& operator=(const ObjectPtrBase& x) {
       // specialisation to ensure m_id is not overwritten
       std::shared_ptr<graphcode::object>::operator=(x);
@@ -254,13 +254,13 @@ namespace graphcode
     using Super::erase;
     using Super::count;
     using Super::insert;
-    typename Super::iterator find(GraphId id) {
+    typename OMap<T>::Super::iterator find(GraphId id) {
       ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
-    typename Super::const_iterator find(GraphId id) const {
+    typename OMap<T>::Super::const_iterator find(GraphId id) const {
       ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
-    typename Super::iterator erase(GraphId id) {
+    size_t erase(GraphId id) {
       ObjectPtr<T> tmp(id); return Super::erase(tmp);
     }
     size_t count(GraphId id) const {
@@ -404,14 +404,15 @@ namespace graphcode
     /** 
         add the specified object into the Graph, replacing any already present
     */
-
+  
     
     ObjRef overwriteObject(const ObjectPtr<T>& o)
     {
-      auto i=objects.find(o->id);
+      auto i=objects.find(o.id());
       if (i==objects.end())
         return insertObject(o);
-      *i=o;
+      // const cast OK here because id is not changed
+      const_cast<ObjectPtr<T>&>(*i)=o;
       return *i;
     }
   
