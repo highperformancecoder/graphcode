@@ -250,19 +250,18 @@ namespace graphcode
   template <class T> using OMapImpl=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
   template <class T> struct OMap: public OMapImpl<T>
   {
-    using OMapImpl<T>::erase;
-    using OMapImpl<T>::count;
-    using OMapImpl<T>::insert;
-    using typename OMapImpl<T>::iterator;
-    using typename OMapImpl<T>::const_iterator;
-    OMap::iterator find(GraphId id) {
-      ObjectPtr<T> tmp(id); return OMapImpl<T>::find(tmp);
+    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
+    using Super::erase;
+    using Super::count;
+    using Super::insert;
+    typename OMap<T>::Super::iterator find(GraphId id) {
+      ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
-    OMap::const_iterator find(GraphId id) const {
-      ObjectPtr<T> tmp(id); return OMapImpl<T>::find(tmp);
+    typename OMap<T>::Super::const_iterator find(GraphId id) const {
+      ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
     size_t erase(GraphId id) {
-      ObjectPtr<T> tmp(id); return OMapImpl<T>::erase(tmp);
+      ObjectPtr<T> tmp(id); return Super::erase(tmp);
     }
     size_t count(GraphId id) const {
       ObjectPtr<T> tmp(id); return OMapImpl<T>::count(tmp);
@@ -417,13 +416,14 @@ namespace graphcode
     /** 
         add the specified object into the Graph, replacing any already present
     */
-
+  
     
     ObjRef overwriteObject(const ObjectPtr<T>& o)
     {
       auto i=objects.find(o.id());
       if (i==objects.end())
         return insertObject(o);
+      // const cast OK here because id is not changed
       const_cast<ObjectPtr<T>&>(*i)=o;
       return *i;
     }
@@ -521,5 +521,4 @@ namespace classdesc_access
   };
 }
   
-#include "graphcode.cd"
 #endif  /* GRAPHCODE_H */
