@@ -13,6 +13,8 @@
 #include <object.h>
 #include <pack_base.h>
 #include <pack_stl.h>
+#include <RESTProcess_base.h>
+#include <polyRESTProcessBase.h>
 
 #ifdef MPI_SUPPORT
 #include <classdescMP.h>
@@ -174,7 +176,7 @@ namespace graphcode
       is a \c Ptrlist of other objects it is connected to (maybe its
       neighbours, maybe its classes or families to which it belongs)
   */
-  class object: public Exclude<PtrList>, public classdesc::object
+  class object: public Exclude<PtrList>, public classdesc::object, public classdesc::PolyRESTProcessBase
   {
   public:
     std::vector<GraphId> neighbours;
@@ -206,8 +208,6 @@ namespace graphcode
       assert(dynamic_cast<const T*>(this));
       return static_cast<const T*>(this);
     }
-    /// allow exposure to scripting environments
-    virtual void RESTProcess(classdesc::RESTProcess_t&,const classdesc::string&) {}
     virtual idx_t weight() const {return 1;} ///< node's weight (for partitioning)
     /// weight for edge connecting \c *this to \a x
     virtual idx_t edgeWeight(const ObjRef& x) const {return 1;} 
@@ -221,6 +221,12 @@ namespace graphcode
     {
 #ifdef RESTPROCESS_H
       classdesc::RESTProcess(r,d,static_cast<T&>(*this));
+#endif
+    }
+    void RESTProcess(RESTProcess_t& r,const classdesc::string& d) const override
+    {
+#ifdef RESTPROCESS_H
+      classdesc::RESTProcess(r,d,static_cast<const T&>(*this));
 #endif
     }
   };
@@ -359,7 +365,7 @@ namespace graphcode
      map of object references (called objects) referring to the nodes.   */
 
   template <class T>
-  class Graph: public Exclude<GraphBase>
+  class Graph: public GraphBase
   {
     ObjectPtrBase& objectRef(GraphId id) override {return objects[id];}
     bool sane() const override {return objects.sane();}
@@ -434,7 +440,7 @@ namespace graphcode
       auto i=objects.find(id);
       if (i==objects.end())
         return insertObject(ObjectPtr<T>(id, std::make_shared<U>(std::forward<Args>(args)...)));
-      return **i;
+      return *i;
     }
   };		   
 }
@@ -442,6 +448,7 @@ namespace graphcode
 #ifdef _CLASSDESC
 #pragma omit pack graphcode::ObjectPtrBase
 #pragma omit unpack graphcode::ObjectPtrBase
+#pragma omit RESTProcess graphcode::ObjectPtrBase
 #pragma omit pack graphcode::OMap
 #pragma omit unpack graphcode::OMap
 #endif
@@ -473,6 +480,17 @@ namespace classdesc_access
     }
   };
   
+  template <>
+  struct access_RESTProcess<graphcode::ObjectPtrBase> {
+    template <class U>
+    void operator()(cd::RESTProcess_t& r, const cd::string& d, U& a)
+    {
+      ::RESTProcess(r,d+".id",a,&::graphcode::ObjectPtrBase::id);
+      ::RESTProcess(r,d+".proc",a,&::graphcode::ObjectPtrBase::proc);
+      if (a) a->RESTProcess(r,d);
+    }
+  };
+
   template <class T>
   struct access_pack<graphcode::OMap<T>> {
     template <class U>
