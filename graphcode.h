@@ -395,8 +395,8 @@ namespace graphcode
 #ifdef MPI_SUPPORT
       rec_req.clear();
       MPIbuf() << objects << bcast(0) >> objects;
-      rebuildPtrLists();
 #endif
+      rebuildPtrLists();
     }
 
     /** 

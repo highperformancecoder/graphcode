@@ -47,8 +47,8 @@ namespace graphcode
   void GraphBase::partitionObjects()
   {
 #if defined(MPI_SUPPORT) && defined(PARMETIS)
-    if (nprocs()==1) return;
     rebuildPtrLists();
+    if (nprocs()==1) return;
     prepareNeighbours(); /* used for computing edgeweights */
 
     unsigned i, j, nedges, nvertices=objectRefs.size();
@@ -201,7 +201,7 @@ namespace graphcode
         assert(proc<nprocs());
         objectRef(index).proc=proc;
       }
-    rebuildPtrLists();
 #endif /* MPI_SUPPORT */
+    rebuildPtrLists();
 };
 }
