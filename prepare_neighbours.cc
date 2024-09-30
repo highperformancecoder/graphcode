@@ -67,7 +67,7 @@ namespace graphcode
 	for (unsigned i=0; i<requests[b.proc].size(); i++) 
 	  b>>objectRef(requests[b.proc][i]);
       }
-      rebuildPtrLists();
+    rebuildPtrLists();
 #endif /* MPI_SUPPORT */
   }
 
