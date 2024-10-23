@@ -143,6 +143,7 @@ namespace graphcode
   {
     
     ObjectPtrBase *payload=nullptr; /* referenced data */
+    CLASSDESC_ACCESS(ObjRef);
   public:
     ObjRef()=default;
     ObjRef(const ObjectPtrBase& x): payload(const_cast<ObjectPtrBase*>(&x)) {}
@@ -196,16 +197,22 @@ namespace graphcode
     /// call this method on an object that is not T. Runtime checks
     /// are not performed.
     template <class T> T* cloneObject() const {
+#ifndef SYCL_LANGUAGE_VERSION
       assert(dynamic_cast<const T*>(this));
+#endif
       return static_cast<T*>(clone());
     }
     /// return a reference to this
     template <class T> T* as() {
+#ifndef SYCL_LANGUAGE_VERSION
       assert(dynamic_cast<T*>(this));
+#endif
       return static_cast<T*>(this);
     }
     template <class T> const T* as() const {
+#ifndef SYCL_LANGUAGE_VERSION
       assert(dynamic_cast<const T*>(this));
+#endif
       return static_cast<const T*>(this);
     }
     virtual idx_t weight() const {return 1;} ///< node's weight (for partitioning)
@@ -305,6 +312,7 @@ namespace graphcode
     unsigned tag=0;  /* tag used to ensure message groups do not overlap */
     /// checks that objects all have unique keys (ids).
     virtual bool sane() const=0;
+    CLASSDESC_ACCESS(GraphBase);
   public:
     static bool typeRegistered(const graphcode::object& x) {return x.type()>=0;}
     PtrList objectRefs;
@@ -368,7 +376,9 @@ namespace graphcode
   {
     ObjectPtrBase& objectRef(GraphId id) override {return objects[id];}
     bool sane() const override {return objects.sane();}
+    CLASSDESC_ACCESS(Graph);
   public:
+    using Cell=T;
     OMap<T> objects;
 
     void rebuildPtrLists() override
