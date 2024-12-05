@@ -371,16 +371,19 @@ namespace graphcode
   /** Graph is a list of node refs stored on local processor, and has a
      map of object references (called objects) referring to the nodes.   */
 
-  template <class T>
+  template <class T, template<class> class A=std::allocator>
   class Graph: public GraphBase
   {
     ObjectPtrBase& objectRef(GraphId id) override {return objects[id];}
     bool sane() const override {return objects.sane();}
     CLASSDESC_ACCESS(Graph);
+    A<T> alloc;
   public:
     using Cell=T;
     OMap<T> objects;
 
+    Graph(const A<T>& alloc={}): alloc(alloc) {}
+    
     void rebuildPtrLists() override
     {
       clear();
@@ -449,7 +452,7 @@ namespace graphcode
     {
       auto i=objects.find(id);
       if (i==objects.end())
-        return insertObject(ObjectPtr<T>(id, std::make_shared<U>(std::forward<Args>(args)...)));
+        return insertObject(ObjectPtr<T>(id, std::allocate_shared<U>(alloc,std::forward<Args>(args)...)));
       return *i;
     }
   };		   

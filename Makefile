@@ -2,9 +2,10 @@ MPI=
 DEBUGGING=
 OPT=
 PREFIX=$(HOME)/usr
-INCLUDES=-I. -I../classdesc -I$(HOME)/usr/include -I/usr/local/include
-VPATH+=../classdesc $(HOME)/usr/include /usr/local/include
+INCLUDES=-I. -I../classdesc -I../classdesc/json5_parser/json5_parser -I$(HOME)/usr/include -I/usr/local/include
+VPATH+=../classdesc ../classdesc/json5_parser/json5_parser $(HOME)/usr/include /usr/local/include
 OBJS=gather.o prepare_neighbours.o partition.o
+PATH:=../classdesc:$(PATH)
 
 .SUFFIXES: .cc .o .d .cd .h 
 
