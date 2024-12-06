@@ -141,7 +141,7 @@ namespace graphcode
   /** Reference to an object type */
   class ObjRef
   {
-    
+  public:
     ObjectPtrBase *payload=nullptr; /* referenced data */
     CLASSDESC_ACCESS(ObjRef);
   public:
@@ -157,6 +157,57 @@ namespace graphcode
     void nullify() {payload->reset();}
   };
 
+  /// Allocator class - handles SYCL USM allocation, delegates to std::allocator when not needed
+#ifdef SYCL_LANGUAGE_VERSION
+  template <class T>
+  class Allocator
+  {
+    sycl::context context;
+    sycl::device device;
+    sycl::usm::alloc type=sycl::usm::alloc::unknown;
+    template <class U> friend class Allocator;
+  public:
+    using value_type=T;
+    using pointer=T*;
+    using reference=T&;
+    using difference_type=std::ptrdiff_t;
+    using propagate_on_container_move_assignment=std::true_type;
+    
+    Allocator()=default;
+    Allocator(const sycl::context& context, const sycl::device& device, sycl::usm::alloc type):
+      context(context), device(device), type(type) {}
+    Allocator(const sycl::queue& queue, sycl::usm::alloc type): Allocator(queue.get_context(),queue.get_device(),type) {}
+    template <class U> Allocator(const Allocator<U>& x):
+      context(x.context), device(x.device), type(x.type) {}
+    template<class U> struct rebind {using other=Allocator<U>;};
+    T* allocate(size_t n) {
+      if (type==sycl::usm::alloc::unknown)
+        return std::allocator<T>().allocate(n);
+      else
+        return sycl::malloc<T>(n,device,context,type);
+    }
+    void deallocate(T* p,size_t) {
+      if (type==sycl::usm::alloc::unknown)
+        return std::free(p);
+      else
+        return sycl::free(p,context);
+    }
+    bool operator==(const Allocator& x) const {
+      return type==x.type && context==x.context && device==x.device;
+    }
+  };
+#else
+  template <class T>
+  class Allocator: public std::allocator<T>
+  {
+  public:
+    Allocator()=default;
+    template<class U> constexpr Allocator(const Allocator<U>& x) noexcept:
+      std::allocator<T>(x) {}
+    template<class U> struct rebind {using other=Allocator<U>;};
+  };
+#endif
+  
   /**
      Vector of references to objects:
      - serialisable
@@ -164,12 +215,21 @@ namespace graphcode
   */
 
   // PtrList needs copy operations clobbered.
-  struct PtrList: std::vector<ObjRef>
+  struct PtrList: std::vector<ObjRef,Allocator<ObjRef>>
   {
+    using Allocator=Allocator<ObjRef>;
     PtrList()=default;
-    PtrList(const PtrList&) {}
-    template <class I> PtrList(I begin, I end): std::vector<ObjRef>(begin,end) {}
+    PtrList(const PtrList& x) {}
+    template <class I> PtrList(I begin, I end, const Allocator& alloc={}):
+      std::vector<ObjRef,Allocator>(begin,end,alloc) {}
     PtrList& operator=(const PtrList&) {return *this;}
+    // set a new allocation scheme for this vector. This copies any existing elements into the new space
+    void setAllocator(const PtrList::Allocator& alloc) {
+      if (get_allocator()==alloc) return; // nothing to do optimisation
+      PtrList tmp(begin(),end(),alloc);
+      // moving the vector moves the allocator as well, because propagate_on_container_move_assignment is true
+      std::vector<ObjRef,Allocator>::operator=(std::move(tmp));
+    }
   };
   
   /** 
@@ -182,8 +242,9 @@ namespace graphcode
   public:
     std::vector<GraphId> neighbours;
     /// construct the internal pointer-based neighbour list, given the list of neighbours in \a neighbours
-    template <class OMap> void updatePtrList(const OMap& o) {
+    template <class OMap> void updatePtrList(const OMap& o, const Allocator& alloc={}) {
       clear();
+      setAllocator(alloc);
       for (auto& n: neighbours) {
         auto i=o.find(n);
         if (i!=o.end())
@@ -254,13 +315,15 @@ namespace graphcode
       return x.id()==y.id();}
   };
 
-  template <class T> using OMapImpl=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
+  template <class T> using OMapImpl=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>, Allocator<ObjectPtr<T>>>;
   template <class T> struct OMap: public OMapImpl<T>
   {
-    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>>;
+    using Super=std::unordered_set<ObjectPtr<T>, Hash<T>, KeyEqual<T>, Allocator<ObjectPtr<T>>>;
     using Super::erase;
     using Super::count;
     using Super::insert;
+
+    OMap(const Allocator<ObjectPtr<T>>& allocator={}): OMapImpl<T>(allocator) {}
     typename OMap<T>::Super::iterator find(GraphId id) {
       ObjectPtr<T> tmp(id); return Super::find(tmp);
     }
@@ -371,22 +434,26 @@ namespace graphcode
   /** Graph is a list of node refs stored on local processor, and has a
      map of object references (called objects) referring to the nodes.   */
 
-  template <class T, template<class> class A=std::allocator>
+  template <class T>
   class Graph: public GraphBase
   {
     ObjectPtrBase& objectRef(GraphId id) override {return objects[id];}
     bool sane() const override {return objects.sane();}
     CLASSDESC_ACCESS(Graph);
-    A<T> alloc;
+    graphcode::Allocator<T> cellAlloc;
+    PtrList::Allocator ptrListAlloc;
   public:
     using Cell=T;
+    using OMapAllocator=graphcode::Allocator<ObjectPtr<T>>;
     OMap<T> objects;
 
-    Graph(const A<T>& alloc={}): alloc(alloc) {}
+    Graph(const graphcode::Allocator<T>& cellAlloc={}, const PtrList::Allocator& ptrListAlloc={}, const typename Graph::OMapAllocator& mapAllocator={}):
+      cellAlloc(cellAlloc), ptrListAlloc(ptrListAlloc), objects(mapAllocator) {}
     
     void rebuildPtrLists() override
     {
       clear();
+      setAllocator(ptrListAlloc);
       objectRefs.clear();
       for (auto& i: objects)
         {
@@ -395,7 +462,7 @@ namespace graphcode
             assert(i);
             emplace_back(i);
           }
-          if (i) i->updatePtrList(objects);
+          if (i) i->updatePtrList(objects,ptrListAlloc);
         }
     }
 
@@ -452,7 +519,7 @@ namespace graphcode
     {
       auto i=objects.find(id);
       if (i==objects.end())
-        return insertObject(ObjectPtr<T>(id, std::allocate_shared<U>(alloc,std::forward<Args>(args)...)));
+        return insertObject(ObjectPtr<T>(id, std::allocate_shared<U>(cellAlloc,std::forward<Args>(args)...)));
       return *i;
     }
   };		   
@@ -534,4 +601,25 @@ namespace classdesc_access
   };
 }
   
+#define CLASSDESC_RESTProcess___graphcode__Allocator_T_
+#define CLASSDESC_json_pack___graphcode__Allocator_T_
+#define CLASSDESC_json_unpack___graphcode__Allocator_T_
+#define CLASSDESC_pack___graphcode__Allocator_T_
+#define CLASSDESC_unpack___graphcode__Allocator_T_
+
+namespace classdesc_access
+{
+  template <class T>
+  struct access_pack<graphcode::Allocator<T>>:
+    public classdesc::NullDescriptor<classdesc::pack_t> {};
+  template <class T>
+  struct access_unpack<graphcode::Allocator<T>>:
+    public classdesc::NullDescriptor<classdesc::pack_t> {};
+  template <class T>
+  struct access_json_pack<graphcode::Allocator<T>>:
+    public classdesc::NullDescriptor<classdesc::json_pack_t> {};
+  template <class T>
+  struct access_json_unpack<graphcode::Allocator<T>>:
+    public classdesc::NullDescriptor<classdesc::json_pack_t> {};
+}
 #endif  /* GRAPHCODE_H */
