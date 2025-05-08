@@ -41,7 +41,7 @@ typedef int idx_t;  /* just for defining dummy weight functions */
 
 namespace classdesc
 {
-  class RESTProcess_t;
+  struct RESTProcess_t;
 }
 
 namespace graphcode
@@ -117,8 +117,8 @@ namespace graphcode
     GraphId id() const {return m_id;}
     int proc=0;
     ObjectPtrBase(GraphId id=badId, const std::shared_ptr<graphcode::object>& x=nullptr):
-      m_id(id), std::shared_ptr<object>(x) {}
-    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+      std::shared_ptr<object>(x), m_id(id) {}
+    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): std::shared_ptr<object>(x), m_id(id) {}
     ObjectPtrBase& operator=(const ObjectPtrBase& x) {
       // specialisation to ensure m_id is not overwritten
       std::shared_ptr<graphcode::object>::operator=(x);
@@ -148,8 +148,8 @@ namespace graphcode
     ObjRef()=default;
     ObjRef(const ObjectPtrBase& x): payload(const_cast<ObjectPtrBase*>(&x)) {}
     GraphId id() const {return payload? payload->id(): badId;}
-    int proc() const {return payload? payload->proc: 0;}
-    int proc(int p) {if (payload) payload->proc=p; return proc();}
+    unsigned proc() const {return payload? payload->proc: 0;}
+    unsigned proc(unsigned p) {if (payload) payload->proc=p; return proc();}
     object& operator*() const {return **payload;}
     object* operator->() const {return payload->get();}
     operator bool() const {return payload && *payload;}
