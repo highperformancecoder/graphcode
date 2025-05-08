@@ -215,9 +215,9 @@ namespace graphcode
   */
 
   // PtrList needs copy operations clobbered.
-  struct PtrList: std::vector<ObjRef,Allocator<ObjRef>>
+  struct PtrList: std::vector<ObjRef,graphcode::Allocator<ObjRef>>
   {
-    using Allocator=Allocator<ObjRef>;
+    using Allocator=graphcode::Allocator<ObjRef>;
     PtrList()=default;
     PtrList(const PtrList& x) {}
     template <class I> PtrList(I begin, I end, const Allocator& alloc={}):
