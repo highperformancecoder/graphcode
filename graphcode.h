@@ -115,7 +115,7 @@ namespace graphcode
     GraphId m_id;
   public:
     GraphId id() const {return m_id;}
-    int proc=0;
+    unsigned proc=0;
     ObjectPtrBase(GraphId id=badId, const std::shared_ptr<graphcode::object>& x=nullptr):
       std::shared_ptr<object>(x), m_id(id) {}
     ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): std::shared_ptr<object>(x), m_id(id) {}
