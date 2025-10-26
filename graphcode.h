@@ -41,7 +41,7 @@ typedef int idx_t;  /* just for defining dummy weight functions */
 
 namespace classdesc
 {
-  class RESTProcess_t;
+  struct RESTProcess_t;
 }
 
 namespace graphcode
@@ -117,8 +117,8 @@ namespace graphcode
     GraphId id() const {return m_id;}
     int proc=0;
     ObjectPtrBase(GraphId id=badId, const std::shared_ptr<graphcode::object>& x=nullptr):
-      m_id(id), std::shared_ptr<object>(x) {}
-    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): m_id(id), std::shared_ptr<object>(x) {}
+      std::shared_ptr<object>(x), m_id(id)  {}
+    ObjectPtrBase(GraphId id, std::shared_ptr<graphcode::object>&& x): std::shared_ptr<object>(x), m_id(id)  {}
     ObjectPtrBase& operator=(const ObjectPtrBase& x) {
       // specialisation to ensure m_id is not overwritten
       std::shared_ptr<graphcode::object>::operator=(x);
