@@ -287,15 +287,11 @@ namespace graphcode
   {
     void RESTProcess(RESTProcess_t& r,const classdesc::string& d) override
     {
-#ifdef RESTPROCESS_H
       classdesc::RESTProcess(r,d,static_cast<T&>(*this));
-#endif
     }
     void RESTProcess(RESTProcess_t& r,const classdesc::string& d) const override
     {
-#ifdef RESTPROCESS_H
       classdesc::RESTProcess(r,d,static_cast<const T&>(*this));
-#endif
     }
   };
   
