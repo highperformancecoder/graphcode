@@ -381,6 +381,8 @@ namespace graphcode
     PtrList objectRefs;
     virtual ObjectPtrBase& objectRef(GraphId)=0;
 
+    virtual ~GraphBase() {}
+    
     /**
        Rebuild the list of locally hosted objects
     */
