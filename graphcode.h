@@ -39,6 +39,10 @@ typedef int idx_t;  /* just for defining dummy weight functions */
 #include <algorithm>
 #include <iostream>
 
+#ifdef SYCL_LANGUAGE_VERSION
+#include <sycl/sycl.hpp>
+#endif
+
 namespace classdesc
 {
   struct RESTProcess_t;
